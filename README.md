@@ -80,11 +80,19 @@ cd traced
 bash setup.sh
 ```
 
-### Run Extraction
+### Run Pipeline (3 steps)
 ```bash
 conda activate traced
 cd /var/lib/cookmom-workspace/traced
-python extract-sam2.py --image examples/szm-reference.jpg --output szm-extraction.json
+
+# 1. Research — learn about the building FIRST
+python research.py --name "Sheikh Zayed Grand Mosque" --output knowledge.json
+
+# 2. Extract — SAM + Depth + Edges, informed by research
+python extract-sam2.py --image examples/szm-reference.jpg --knowledge knowledge.json --output extraction.json --name "Sheikh Zayed Grand Mosque"
+
+# 3. Generate — draw with math-fitted curves
+python generate.py --extraction extraction.json --output drawing.html --name "Sheikh Zayed Grand Mosque"
 ```
 
 ### What Happens

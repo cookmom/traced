@@ -51,8 +51,9 @@ def find_closest_ratio(value: float) -> dict:
     }
 
 
-def classify_shape(mask: np.ndarray) -> dict:
-    """Classify a mask's shape into 17 architectural types."""
+def classify_shape(mask: np.ndarray, knowledge: dict = None) -> dict:
+    """Classify a mask's shape into 17 architectural types.
+    If knowledge is provided, uses building style to bias classification."""
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return {"type": "unknown", "circularity": 0, "solidity": 0, "convexity": 0, "aspect": 0, "confidence": 0, "vertices": 0}
@@ -190,6 +191,25 @@ def classify_shape(mask: np.ndarray) -> dict:
     elif convexity > 0.7:
         shape_type = "panel"
         confidence = 0.5
+    
+    # Knowledge-biased reclassification
+    if knowledge and shape_type in ("arch", "tall_arch", "unknown"):
+        known_arches = knowledge.get("arch_types", [])
+        if "horseshoe" in known_arches and circularity > 0.35 and aspect > 0.8:
+            shape_type = "horseshoe_arch"
+            confidence = max(confidence, 0.65)
+        elif "cusped" in known_arches and n_vertices > 8:
+            shape_type = "cusped_arch"
+            confidence = max(confidence, 0.6)
+        elif "pointed" in known_arches and aspect < 0.8:
+            shape_type = "pointed_arch"
+            confidence = max(confidence, 0.65)
+    
+    if knowledge and shape_type in ("dome", "dome_like"):
+        known_domes = knowledge.get("dome_types", [])
+        if "hemisphere" in known_domes and 0.4 < (h/max(1,w)) < 0.65:
+            shape_type = "dome"
+            confidence = max(confidence, 0.75)
     
     return {
         "type": shape_type,
@@ -593,8 +613,9 @@ def extract_hierarchy(extraction: dict) -> list:
     return hierarchy
 
 
-def run_sam2_extraction(image_path: str, checkpoint: str = None) -> dict:
-    """Run SAM 2 automatic mask generation on an image."""
+def run_sam2_extraction(image_path: str, checkpoint: str = None, knowledge: dict = None) -> dict:
+    """Run SAM 2 automatic mask generation on an image.
+    If knowledge is provided, uses it to bias shape classification."""
     
     try:
         from sam2.build_sam import build_sam2
@@ -675,7 +696,7 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None) -> dict:
         mask = mask_data["segmentation"].astype(np.uint8)
         
         # Classify shape
-        shape = classify_shape(mask)
+        shape = classify_shape(mask, knowledge)
         
         # Fit primitives
         primitives = fit_primitives(mask, shape)
@@ -889,7 +910,7 @@ def run_opencv_extraction(image_path: str) -> dict:
         mask = np.zeros((img_h, img_w), dtype=np.uint8)
         cv2.drawContours(mask, [contour], -1, 1, -1)
         
-        shape = classify_shape(mask)
+        shape = classify_shape(mask, knowledge)
         primitives = fit_primitives(mask, shape)
         if not primitives:
             continue
@@ -1194,13 +1215,30 @@ def main():
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--js-output", default=None)
     parser.add_argument("--name", default="Unknown Building", help="Building name for analysis card")
+    parser.add_argument("--knowledge", default=None, help="Path to knowledge.json from research.py")
     args = parser.parse_args()
     
-    extraction = run_sam2_extraction(args.image, args.checkpoint)
+    # Load research knowledge if provided
+    knowledge = None
+    if args.knowledge and Path(args.knowledge).exists():
+        knowledge = json.loads(Path(args.knowledge).read_text())
+        print(f"Loaded research knowledge: {len(knowledge.get('style_influences', []))} styles, "
+              f"{len(knowledge.get('arch_types', []))} arch types, "
+              f"{len(knowledge.get('dome_types', []))} dome types")
+    
+    extraction = run_sam2_extraction(args.image, args.checkpoint, knowledge)
     extraction = compute_relationships(extraction)
     
     js_code = generate_js(extraction)
     extraction["generated_js"] = js_code
+    if knowledge:
+        extraction["knowledge"] = {
+            "styles": knowledge.get("style_influences", []),
+            "arch_types": knowledge.get("arch_types", []),
+            "dome_types": knowledge.get("dome_types", []),
+            "dimensions": knowledge.get("dimensions", {}),
+            "traditions": list(knowledge.get("traditions", {}).keys()),
+        }
     
     card = generate_analysis_card(extraction, args.name)
     extraction["analysis_card"] = card
