@@ -169,6 +169,72 @@ def search_wikipedia(building_name: str) -> dict:
         return {}
 
 
+def search_archdaily(building_name: str) -> dict:
+    """Search ArchDaily for architectural information."""
+    if not HAS_REQUESTS:
+        return {}
+    
+    try:
+        headers = {"User-Agent": "Traced/1.0 (architectural research)"}
+        query = building_name.replace(" ", "+")
+        url = f"https://www.archdaily.com/search/all?q={query}"
+        
+        if HAS_MARKITDOWN:
+            md = MarkItDown()
+            result = md.convert_url(url)
+            text = result.text_content
+            if text and len(text) > 100:
+                return {"source": "archdaily", "url": url, "text": text[:5000]}
+        
+        return {}
+    except Exception as e:
+        print(f"    ArchDaily search failed: {e}")
+        return {}
+
+
+def search_archnet(building_name: str) -> dict:
+    """Search Archnet (Aga Khan) for Islamic architecture data."""
+    if not HAS_REQUESTS:
+        return {}
+    
+    try:
+        headers = {"User-Agent": "Traced/1.0 (architectural research)"}
+        query = building_name.replace(" ", "+")
+        url = f"https://www.archnet.org/search?q={query}"
+        
+        if HAS_MARKITDOWN:
+            md = MarkItDown()
+            result = md.convert_url(url)
+            text = result.text_content
+            if text and len(text) > 100:
+                return {"source": "archnet", "url": url, "text": text[:5000]}
+        
+        return {}
+    except Exception as e:
+        return {}
+
+
+def search_dezeen(building_name: str) -> dict:
+    """Search Dezeen for contemporary architecture coverage."""
+    if not HAS_REQUESTS:
+        return {}
+    
+    try:
+        query = building_name.replace(" ", "+")
+        url = f"https://www.dezeen.com/?s={query}"
+        
+        if HAS_MARKITDOWN:
+            md = MarkItDown()
+            result = md.convert_url(url)
+            text = result.text_content
+            if text and len(text) > 100:
+                return {"source": "dezeen", "url": url, "text": text[:5000]}
+        
+        return {}
+    except Exception as e:
+        return {}
+
+
 def search_wikiarquitectura(building_name: str) -> dict:
     """Search WikiArquitectura for architectural data."""
     if not HAS_REQUESTS:
@@ -391,6 +457,25 @@ def build_knowledge(building_name: str, extraction: dict = None) -> dict:
             knowledge["dome_types"] = dome_types
             print(f"    Dome types: {dome_types}")
     
+    # Search ArchDaily
+    print("  Searching ArchDaily...")
+    archdaily = search_archdaily(building_name)
+    if archdaily:
+        knowledge["sources"].append(archdaily)
+        text = archdaily.get("text", "")
+        dims2 = extract_dimensions(text)
+        if dims2:
+            knowledge.setdefault("dimensions", {}).update(dims2)
+        for inf in extract_style_influences(text):
+            if inf not in knowledge.get("style_influences", []):
+                knowledge.setdefault("style_influences", []).append(inf)
+        for at in extract_arch_types(text):
+            if at not in knowledge.get("arch_types", []):
+                knowledge.setdefault("arch_types", []).append(at)
+        for dt in extract_dome_types(text):
+            if dt not in knowledge.get("dome_types", []):
+                knowledge.setdefault("dome_types", []).append(dt)
+    
     # Search WikiArquitectura
     print("  Searching WikiArquitectura...")
     wikiarch = search_wikiarquitectura(building_name)
@@ -407,6 +492,25 @@ def build_knowledge(building_name: str, extraction: dict = None) -> dict:
         for inf in influences2:
             if inf not in knowledge.get("style_influences", []):
                 knowledge.setdefault("style_influences", []).append(inf)
+    
+    # Search Archnet (Aga Khan — best for Islamic architecture)
+    print("  Searching Archnet (Aga Khan)...")
+    archnet = search_archnet(building_name)
+    if archnet:
+        knowledge["sources"].append(archnet)
+        text = archnet.get("text", "")
+        dims3 = extract_dimensions(text)
+        if dims3:
+            knowledge.setdefault("dimensions", {}).update(dims3)
+        for inf in extract_style_influences(text):
+            if inf not in knowledge.get("style_influences", []):
+                knowledge.setdefault("style_influences", []).append(inf)
+    
+    # Search Dezeen (contemporary)
+    print("  Searching Dezeen...")
+    dezeen = search_dezeen(building_name)
+    if dezeen:
+        knowledge["sources"].append(dezeen)
     
     # Determine tradition from influences
     influences = knowledge.get("style_influences", [])
