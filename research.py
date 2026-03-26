@@ -127,7 +127,8 @@ def search_wikipedia(building_name: str) -> dict:
             "format": "json",
             "srlimit": 3,
         }
-        resp = requests.get(search_url, params=params, timeout=10)
+        headers = {"User-Agent": "Traced/1.0 (architectural research tool; contact: github.com/cookmom/traced)"}
+        resp = requests.get(search_url, params=params, timeout=10, headers=headers)
         results = resp.json().get("query", {}).get("search", [])
         
         if not results:
@@ -137,13 +138,25 @@ def search_wikipedia(building_name: str) -> dict:
         page_title = results[0]["title"]
         content_url = f"https://en.wikipedia.org/wiki/{page_title.replace(' ', '_')}"
         
-        if HAS_MARKITDOWN:
+        # Get plain text extract from Wikipedia API (more reliable than scraping)
+        extract_params = {
+            "action": "query",
+            "titles": page_title,
+            "prop": "extracts",
+            "explaintext": True,
+            "format": "json",
+        }
+        resp = requests.get(search_url, params=extract_params, timeout=10, headers=headers)
+        pages = resp.json().get("query", {}).get("pages", {})
+        text = ""
+        for page_id, page_data in pages.items():
+            text = page_data.get("extract", "")
+            break
+        
+        if not text and HAS_MARKITDOWN:
             md = MarkItDown()
             result = md.convert_url(content_url)
             text = result.text_content
-        else:
-            resp = requests.get(content_url, timeout=15)
-            text = resp.text
         
         return {
             "source": "wikipedia",
