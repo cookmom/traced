@@ -432,9 +432,209 @@ function draw(){{
     return html
 
 
+def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, building_name: str) -> str:
+    """Generate drawing using ONLY optimized mathematical parameters.
+    No edge paths. No contour tracing. Pure compass-and-straightedge geometry."""
+    
+    params = optimized["params"]
+    
+    # Sort by depth layer (back to front)
+    layer_order = {"distant_sky": 0, "background_domes": 1, "mid_facade": 2, "foreground_frame": 3}
+    
+    # Match params to extraction elements for depth info
+    el_lookup = {e["name"]: e for e in extraction.get("elements", [])}
+    
+    sorted_names = sorted(params.keys(), key=lambda n: 
+        layer_order.get(el_lookup.get(n, {}).get("depth", {}).get("layer", "mid_facade"), 2))
+    
+    # Build curve definitions and steps
+    curve_defs = []
+    steps_js = []
+    
+    for idx, name in enumerate(sorted_names):
+        p = params[name]
+        shape = p.get("type", "unknown")
+        el = el_lookup.get(name, {})
+        depth = el.get("depth", {})
+        weight = depth.get("line_weight", 1.5)
+        layer = depth.get("layer", "mid_facade")
+        
+        # Generate the mathematical curve
+        if "dome" in shape:
+            dome_profile = "hemisphere"
+            hr = p.get("h_ratio", 1.0)
+            if hr > 1.4:
+                dome_profile = "onion"
+            elif hr > 0.6:
+                dome_profile = "hemisphere"
+            else:
+                dome_profile = "saucer"
+            
+            curve_defs.append(generate_dome_js(name, p["cx"], p["cy"], p["radius"], dome_profile))
+            formula = f'hemisphere R={p["radius"]:.1f} | {layer} wt={weight}'
+            
+            bbox = f'[{int(p["cx"]-p["radius"]-10)},{int(p["cy"]-p["radius"]*hr-10)},{int(p["cx"]+p["radius"]+10)},{int(p["cy"]+10)}]'
+            dur = 1.2
+            
+            draw = f"""brush.set('2H','#5a5248',{weight});
+      if(pts_{name}){{var n=Math.max(3,Math.round(p*pts_{name}.length));
+      var sub=pts_{name}.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
+      var tip=sub[sub.length-1];
+      if(p<0.9){{brush.set('2H','#a09888',0.5);brush.line({p["cx"]:.0f},{p["cy"]:.0f},tip[0],tip[1]);brush.circle({p["cx"]:.0f},{p["cy"]:.0f},4);}}}}"""
+            
+            # Add drum line below dome
+            if p["radius"] > 50:
+                draw += f"""
+      if(p>0.85){{brush.set('2H','#5a5248',{weight*0.8:.1f});
+      brush.line({p["cx"]-p["radius"]*0.85:.0f},{p["cy"]:.0f},{p["cx"]+p["radius"]*0.85:.0f},{p["cy"]:.0f});}}"""
+        
+        elif "arch" in shape:
+            profile = "pointed"
+            if "horseshoe" in shape:
+                profile = "horseshoe"
+            elif "ogee" in shape:
+                profile = "ogee"
+            
+            rr = p.get("rise_ratio", 0.866)
+            curve_defs.append(generate_arch_js(name, p["cx"], p["spring_y"], p["half_span"], profile, rr))
+            formula = f'{profile} rise/span={rr:.3f} | {layer} wt={weight}'
+            
+            rise = p["half_span"] * 2 * rr
+            bbox = f'[{int(p["cx"]-p["half_span"]-10)},{int(p["spring_y"]-rise-10)},{int(p["cx"]+p["half_span"]+10)},{int(p["spring_y"]+20)}]'
+            dur = 1.4 if p["half_span"] > 100 else 0.8
+            
+            draw = f"""brush.set('2H','#5a5248',{weight});
+      if(pts_{name}){{var n=Math.max(3,Math.round(p*0.8*pts_{name}.length));
+      var sub=pts_{name}.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
+      if(p<0.85){{brush.set('2H','#a09888',0.5);var tip=sub[sub.length-1];brush.line({p["cx"]:.0f},{p["spring_y"]:.0f},tip[0],tip[1]);brush.circle({p["cx"]:.0f},{p["spring_y"]:.0f},4);}}}}
+      if(p>0.8){{brush.set('2H','#5a5248',{weight});
+      brush.line({p["cx"]-p["half_span"]:.0f},{p["spring_y"]:.0f},{p["cx"]-p["half_span"]:.0f},{p["spring_y"]+p["half_span"]*0.3:.0f});
+      brush.line({p["cx"]+p["half_span"]:.0f},{p["spring_y"]:.0f},{p["cx"]+p["half_span"]:.0f},{p["spring_y"]+p["half_span"]*0.3:.0f});}}"""
+        
+        elif shape in ("wall", "rectangle", "square"):
+            formula = f'rectangle {p["w"]:.0f}×{p["h"]:.0f} | {layer} wt={weight}'
+            bbox = f'[{int(p["x"]-5)},{int(p["y"]-5)},{int(p["x"]+p["w"]+5)},{int(p["y"]+p["h"]+5)}]'
+            dur = 0.6
+            curve_defs.append(f"\n    // {name}: rectangle")
+            
+            draw = f"""brush.set('2H','#5a5248',{weight});
+      var rp=p;
+      if(rp>0)brush.line({p["x"]:.0f},{p["y"]:.0f},{p["x"]+p["w"]:.0f},{p["y"]:.0f});
+      if(rp>0.25)brush.line({p["x"]+p["w"]:.0f},{p["y"]:.0f},{p["x"]+p["w"]:.0f},{p["y"]+p["h"]:.0f});
+      if(rp>0.5)brush.line({p["x"]+p["w"]:.0f},{p["y"]+p["h"]:.0f},{p["x"]:.0f},{p["y"]+p["h"]:.0f});
+      if(rp>0.75)brush.line({p["x"]:.0f},{p["y"]+p["h"]:.0f},{p["x"]:.0f},{p["y"]:.0f});"""
+        else:
+            continue
+        
+        ccx = p.get("cx", p.get("x", 540) + p.get("w", 100)/2)
+        ccy = p.get("cy", p.get("y", 960) + p.get("h", 100)/2)
+        
+        steps_js.append(f"""  {{name:'{name.upper().replace("_"," ")}',formula:'{formula}',dur:{dur:.1f},
+   bbox:{bbox},
+   draw:function(p){{
+      {draw}
+      return[{ccx:.0f},{ccy:.0f}];
+   }}}},""")
+    
+    # Wash steps
+    wash_start = len(steps_js)
+    wash_colors = {"distant_sky": ("#87CEEB", 30), "background_domes": ("#D4C5B0", 20), 
+                   "mid_facade": ("#4A5568", 15), "foreground_frame": ("#C4B89A", 25)}
+    
+    for idx, name in enumerate(sorted_names):
+        p = params[name]
+        el = el_lookup.get(name, {})
+        layer = el.get("depth", {}).get("layer", "mid_facade")
+        color, alpha = wash_colors.get(layer, ("#888888", 15))
+        
+        # Only wash elements with significant area
+        if "dome" in p.get("type", "") and p.get("radius", 0) > 40:
+            ccx, ccy = p["cx"], p["cy"]
+            r = p["radius"]
+            steps_js.append(f"""  {{name:'{name.upper().replace("_"," ")} WASH',formula:'{color} α={alpha}',dur:0.05,
+   bbox:[{int(ccx-r)},{int(ccy-r)},{int(ccx+r)},{int(ccy+r)}],
+   draw:function(p){{if(p>=0){{randomSeed({7000+idx});brush.noStroke();brush.fill('{color}',{alpha});brush.fillBleed(0.001);brush.fillTexture(0,0);
+   if(pts_{name})brush.polygon(pts_{name}.map(function(pt){{return[pt[0],pt[1]]}}));brush.noFill();}}return[{ccx:.0f},{ccy:.0f}];}}}},""")
+        
+        elif p.get("type") in ("wall", "rectangle", "square"):
+            steps_js.append(f"""  {{name:'{name.upper().replace("_"," ")} WASH',formula:'{color} α={alpha}',dur:0.05,
+   bbox:[{int(p["x"])},{int(p["y"])},{int(p["x"]+p["w"])},{int(p["y"]+p["h"])}],
+   draw:function(p){{if(p>=0){{randomSeed({7000+idx});brush.noStroke();brush.fill('{color}',{alpha});brush.fillBleed(0.001);brush.fillTexture(0,0);
+   brush.rect({p["x"]:.0f},{p["y"]:.0f},{p["w"]:.0f},{p["h"]:.0f});brush.noFill();}}return[{p["x"]+p["w"]/2:.0f},{p["y"]+p["h"]/2:.0f}];}}}},""")
+    
+    all_steps = "\n".join(steps_js)
+    curve_defs_js = "\n".join(curve_defs)
+    
+    html = f"""<!-- بسم الله الرحمن الرحيم -->
+<!-- Generated by Traced Pipeline — {building_name} -->
+<!-- OPTIMIZED: Pure mathematical curves from gradient descent -->
+<!-- No edge tracing. Compass-and-straightedge geometry only. -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<style>
+*{{margin:0}}body{{background:#f2eada;overflow:hidden;margin:0;padding:0;display:flex;justify-content:center;align-items:flex-start}}canvas{{object-fit:contain!important;display:block;max-height:100vh;max-width:calc(100vh*9/16)}}
+#hud{{position:fixed;top:0;left:0;width:100vw;height:100%;pointer-events:none;font-family:'SF Mono','Fira Code',monospace;overflow:hidden}}
+.track-box{{position:absolute;transition:opacity 0.3s,left 0.4s,top 0.4s,width 0.4s,height 0.4s;min-width:60px;min-height:60px;overflow:visible}}
+.track-box::before,.track-box::after,.track-box .bl::before,.track-box .br::before{{content:'';position:absolute;width:30px;height:30px;border-color:#5a5248;border-style:solid;border-width:0}}
+.track-box::before{{top:-2px;left:-2px;border-top-width:1.5px;border-left-width:1.5px}}.track-box::after{{top:-2px;right:-2px;border-top-width:1.5px;border-right-width:1.5px}}
+.track-box .bl::before{{bottom:-2px;left:-2px;border-bottom-width:1.5px;border-left-width:1.5px;position:absolute}}.track-box .br::before{{bottom:-2px;right:-2px;border-bottom-width:1.5px;border-right-width:1.5px;position:absolute}}
+.corner-circ{{position:absolute;width:4px;height:4px;border:1px solid #5a5248;border-radius:50%}}.corner-circ.tl{{top:-2px;left:-2px}}.corner-circ.tr{{top:-2px;right:-2px}}.corner-circ.bl2{{bottom:-2px;left:-2px}}.corner-circ.br2{{bottom:-2px;right:-2px}}
+.hud-info{{position:absolute;bottom:100%;left:0;margin-bottom:4px;background:rgba(242,234,218,0.88);border:1px solid rgba(90,82,72,0.3);border-radius:4px;padding:4px 8px;white-space:nowrap}}
+.hud-label{{color:#3a3430;font-weight:500;letter-spacing:0.3px;text-transform:uppercase;margin-bottom:3px}}.hud-formula{{color:#5a5248;letter-spacing:0.3px;margin-bottom:2px}}.hud-coords{{color:#8a8278;letter-spacing:0.3px}}
+#pencil-dot{{position:absolute;width:14px;height:14px;pointer-events:none;z-index:15}}#pencil-dot::before{{content:'';position:absolute;left:6px;top:0;width:1px;height:14px;background:#5a5248}}#pencil-dot::after{{content:'';position:absolute;top:6px;left:0;width:14px;height:1px;background:#5a5248}}
+#pencil-dot .ch-circle{{position:absolute;top:4px;left:4px;width:6px;height:6px;border:1px solid #5a5248;border-radius:50%}}
+</style>
+</head>
+<body>
+<div id="hud"><div id="pencil-dot" style="display:none"><div class="ch-circle"></div></div></div>
+<script>
+var W={CANVAS_W},H={CANVAS_H},cx=W/2;
+{curve_defs_js}
+
+var ANNOT_FONT=13,_dimLabels=[],_lastDimStep=-1;
+function clearDimLabels(){{for(var i=0;i<_dimLabels.length;i++)_dimLabels[i].remove();_dimLabels=[];}}
+function addDimText(x,y,t,a){{for(var i=0;i<_dimLabels.length;i++)if(_dimLabels[i]._t===t)return;var el=document.createElement('div');el._t=t;var s=window._hudScale||1,r=window._canvasEl?window._canvasEl.getBoundingClientRect():{{left:0,top:0}};el.style.cssText='position:absolute;color:#8a8278;font-family:SF Mono,Fira Code,monospace;font-size:'+Math.max(9,Math.round(ANNOT_FONT*s))+'px;white-space:nowrap;pointer-events:none;';el.style.left=(x*s+r.left)+'px';el.style.top=(y*s+r.top)+'px';if(a==='center')el.style.transform='translateX(-50%)';el.textContent=t;document.getElementById('hud').appendChild(el);_dimLabels.push(el);}}
+function drawAnnotations(step){{if(step!==_lastDimStep){{clearDimLabels();_lastDimStep=step;}}if(step>=0)addDimText(cx,H-40,'Traced | {building_name} | optimized mathematical geometry','center');}}
+
+var FPS=30;
+var STEPS=[
+{all_steps}
+];
+var PAUSE_S=0.14,WASH_START={wash_start};
+var frameStarts=[],frameEnds=[],f2=0;
+for(var i=0;i<STEPS.length;i++){{frameStarts.push(Math.round(f2));f2+=STEPS[i].dur*FPS;frameEnds.push(Math.round(f2));if(i<STEPS.length-1&&i<WASH_START-1)f2+=PAUSE_S*FPS;}}
+var totalAnimFrames=Math.round(f2);
+var trackBox=null,pencilDot=null;
+function createTrackBox(step){{var hud=document.getElementById('hud');if(trackBox)trackBox.remove();var box=document.createElement('div');box.className='track-box';var s=window._hudScale||1,r=window._canvasEl?window._canvasEl.getBoundingClientRect():{{left:0,top:0}};var b=step.bbox,pad=12*s;var cb0=Math.max(20,b[0]),cb1=Math.max(20,b[1]),cb2=Math.min(W-20,b[2]),cb3=Math.min(H-20,b[3]);box.style.left=(cb0*s+r.left-pad)+'px';box.style.top=(cb1*s+r.top-pad)+'px';box.style.width=((cb2-cb0)*s+pad*2)+'px';box.style.height=((cb3-cb1)*s+pad*2)+'px';['tl','tr','bl2','br2'].forEach(function(c){{var ci=document.createElement('div');ci.className='corner-circ '+c;box.appendChild(ci);}});var bl=document.createElement('div');bl.className='bl';bl.style.cssText='position:absolute;bottom:0;left:0;width:100%;height:100%;pointer-events:none;';box.appendChild(bl);var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none;';box.appendChild(br);var _fs=Math.max(9,Math.round(ANNOT_FONT*(window._hudScale||1)))+'px';var info=document.createElement('div');info.className='hud-info';if((cb1*s+r.top-pad)<80){{info.style.bottom='auto';info.style.top='6px';info.style.marginBottom='0';}}var lbl=document.createElement('div');lbl.className='hud-label';lbl.style.fontSize=_fs;lbl.textContent=step.name;info.appendChild(lbl);var frm=document.createElement('div');frm.className='hud-formula';frm.style.fontSize=_fs;frm.textContent=step.formula;info.appendChild(frm);var crd=document.createElement('div');crd.className='hud-coords';crd.style.fontSize=_fs;crd.id='live-coords';crd.textContent='x:\\u2014 y:\\u2014';info.appendChild(crd);box.appendChild(info);hud.appendChild(box);trackBox=box;}}
+function updatePencilDot(x,y){{if(!pencilDot)pencilDot=document.getElementById('pencil-dot');pencilDot.style.display='block';var s=window._hudScale||1,r=window._canvasEl?window._canvasEl.getBoundingClientRect():{{left:0,top:0}};pencilDot.style.left=(x*s+r.left-7)+'px';pencilDot.style.top=(y*s+r.top-7)+'px';var el=document.getElementById('live-coords');if(el)el.textContent='x:'+Math.round(x)+' y:'+Math.round(y);}}
+var lastHudStep=-1,_inFillPhase=false;
+function setup(){{var c=createCanvas(W,H,WEBGL);pixelDensity(1);var vh=window.innerHeight;var cw=Math.min(window.innerWidth,vh*9/16);c.elt.style.width=cw+'px';c.elt.style.height=(cw/(W/H))+'px';c.elt.style.display='block';c.elt.style.margin='0';brush.load();frameRate(FPS);window._hudScale=c.elt.getBoundingClientRect().width/W;window._canvasEl=c.elt;window.addEventListener('resize',function(){{window._hudScale=c.elt.getBoundingClientRect().width/W;_lastDimStep=-1;}});}}
+function draw(){{
+  translate(-width/2,-height/2);var f3=frameCount-1;if(f3>=totalAnimFrames)f3=totalAnimFrames-1;
+  var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
+  if(activeStep<WASH_START){{_inFillPhase=false;background(242,234,218);for(var i=0;i<activeStep;i++)STEPS[i].draw(1);}}
+  else{{if(!_inFillPhase){{background(242,234,218);for(var i=0;i<WASH_START;i++)STEPS[i].draw(1);drawAnnotations(WASH_START-1);_inFillPhase=true;}}}}
+  var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);var tip=STEPS[activeStep].draw(prog);
+  if(!_inFillPhase)drawAnnotations(activeStep-1);
+  if(activeStep!==lastHudStep){{createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}}
+  if(trackBox){{var _r3=window._canvasEl?window._canvasEl.getBoundingClientRect():{{left:0,top:0}},_s3=window._hudScale||1,_b3=STEPS[activeStep].bbox,_p3=12*_s3;trackBox.style.left=(Math.max(20,_b3[0])*_s3+_r3.left-_p3)+'px';trackBox.style.top=(Math.max(20,_b3[1])*_s3+_r3.top-_p3)+'px';}}
+  if(tip)updatePencilDot(tip[0],tip[1]);
+  if(f3>=totalAnimFrames-1){{noLoop();if(pencilDot)pencilDot.style.display='none';if(trackBox)trackBox.remove();trackBox=null;setTimeout(function(){{clearDimLabels();}},6500);setTimeout(function(){{window.location.reload();}},7000);}}
+}}
+</script>
+</body>
+</html>"""
+    return html
+
+
 def main():
     parser = argparse.ArgumentParser(description="Traced: Generate drawing from extraction + knowledge")
     parser.add_argument("--extraction", required=True)
+    parser.add_argument("--optimized", default=None, help="Optimized params from optimize.py")
     parser.add_argument("--knowledge", default=None)
     parser.add_argument("--output", default="drawing.html")
     parser.add_argument("--name", default="Building")
@@ -447,15 +647,23 @@ def main():
     elif extraction.get("knowledge"):
         knowledge = extraction["knowledge"]
     
-    html = generate_html(extraction, knowledge, args.name)
+    optimized = None
+    if args.optimized and Path(args.optimized).exists():
+        optimized = json.loads(Path(args.optimized).read_text())
+        print(f"Using optimized parameters from {args.optimized}")
+    
+    if optimized:
+        html = generate_from_optimized(optimized, extraction, knowledge, args.name)
+    else:
+        html = generate_html(extraction, knowledge, args.name)
+    
     Path(args.output).write_text(html)
     
     elements = [e for e in extraction["elements"] if 0.003 < e.get("area_pct", 0) < 0.4]
-    n_edges = sum(len(filter_edges(e.get("edge_paths", []), e.get("shape", {}).get("type", ""), e.get("primitives", {}).get("bbox", {}))) for e in elements)
     
     print(f"Generated {args.output}")
-    print(f"  Elements: {len(elements)} (math-fitted)")
-    print(f"  Filtered edge paths: {n_edges} (from {sum(len(e.get('edge_paths',[])) for e in elements)} raw)")
+    print(f"  Mode: {'OPTIMIZED (pure math curves)' if optimized else 'standard (contours + edges)'}")
+    print(f"  Elements: {len(elements)}")
     print(f"  Aspect ratio: preserved ({extraction['image_size']['w']}×{extraction['image_size']['h']} → {CANVAS_W}×{CANVAS_H})")
     if knowledge:
         print(f"  Knowledge applied: {knowledge.get('style_influences', [])}")
