@@ -756,31 +756,53 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None) -> dict:
                         "median": round(median_depth, 4),
                     }
         
-        # Sort elements by depth and assign layers
+        # Sort elements by depth and assign layers using k-means clustering
         depth_elements = [e for e in elements if "depth" in e]
         if depth_elements:
-            depths = [e["depth"]["median"] for e in depth_elements]
-            min_d, max_d = min(depths), max(depths)
+            depths = np.array([e["depth"]["median"] for e in depth_elements])
+            min_d, max_d = float(depths.min()), float(depths.max())
             depth_range = max(0.001, max_d - min_d)
             
+            # Normalize
             for el in depth_elements:
-                norm_depth = (el["depth"]["median"] - min_d) / depth_range
-                el["depth"]["normalized"] = round(norm_depth, 4)
-                # Assign architectural layer
-                if norm_depth < 0.25:
-                    el["depth"]["layer"] = "foreground_frame"
-                    el["depth"]["line_weight"] = 2.5
-                elif norm_depth < 0.50:
-                    el["depth"]["layer"] = "mid_facade"
-                    el["depth"]["line_weight"] = 1.8
-                elif norm_depth < 0.75:
-                    el["depth"]["layer"] = "background_domes"
-                    el["depth"]["line_weight"] = 1.2
-                else:
-                    el["depth"]["layer"] = "distant_sky"
-                    el["depth"]["line_weight"] = 0.6
+                el["depth"]["normalized"] = round((el["depth"]["median"] - min_d) / depth_range, 4)
+            
+            # K-means clustering into 4 layers (or fewer if not enough elements)
+            from scipy.cluster.vq import kmeans, vq
+            norm_depths = np.array([e["depth"]["normalized"] for e in depth_elements]).reshape(-1, 1)
+            n_clusters = min(4, len(depth_elements))
+            
+            if n_clusters >= 2:
+                centroids, _ = kmeans(norm_depths.astype(float), n_clusters)
+                labels, _ = vq(norm_depths.astype(float), centroids)
                 
-                print(f"    {el['name']:25s} depth={norm_depth:.3f} → {el['depth']['layer']} (weight={el['depth']['line_weight']})")
+                # Sort clusters by depth (0 = nearest/foreground)
+                cluster_order = np.argsort(centroids.flatten())
+                label_to_rank = {old: new for new, old in enumerate(cluster_order)}
+                
+                layer_names = ["foreground_frame", "mid_facade", "background_domes", "distant_sky"]
+                layer_weights = [2.5, 1.8, 1.2, 0.6]
+                
+                for i, el in enumerate(depth_elements):
+                    rank = label_to_rank[labels[i]]
+                    # Map rank to layer name (handle < 4 clusters)
+                    if n_clusters == 2:
+                        layer_idx = 0 if rank == 0 else 3
+                    elif n_clusters == 3:
+                        layer_idx = [0, 1, 3][rank]
+                    else:
+                        layer_idx = rank
+                    
+                    el["depth"]["layer"] = layer_names[layer_idx]
+                    el["depth"]["line_weight"] = layer_weights[layer_idx]
+                    el["depth"]["cluster"] = int(rank)
+                    
+                    print(f"    {el['name']:25s} depth={el['depth']['normalized']:.3f} → {el['depth']['layer']} (weight={el['depth']['line_weight']})")
+            else:
+                # Only 1 element — assign to mid
+                depth_elements[0]["depth"]["layer"] = "mid_facade"
+                depth_elements[0]["depth"]["line_weight"] = 1.8
+                print(f"    {depth_elements[0]['name']:25s} → mid_facade (single element)")
         
         result["depth_available"] = True
     else:
