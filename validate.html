@@ -1,0 +1,1000 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Validation Tool</title>
+    <style>
+        * { margin: 0; box-sizing: border-box; }
+        
+        body {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            background: #2a2a2a;
+            padding: 8px 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            border-bottom: 1px solid #3a3a3a;
+            flex-shrink: 0;
+        }
+
+        .btn {
+            background: #3a3a3a;
+            border: 1px solid #4a4a4a;
+            color: #e0e0e0;
+            padding: 6px 12px;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { background: #4a4a4a; }
+        .btn.active { border-color: #00d0ff; color: #00d0ff; }
+        .btn.ref { border-color: #ff4444; color: #ff4444; }
+        .btn.ref:hover, .btn.ref.active { background: #ff444433; color: #ff8888; }
+        .btn.draw { border-color: #00d0ff; color: #00d0ff; }
+        .btn.draw:hover, .btn.draw.active { background: #00d0ff33; color: #44aaff; }
+
+        .btn-group {
+            display: flex;
+            gap: 4px;
+            border-left: 1px solid #4a4a4a;
+            padding-left: 12px;
+        }
+
+        .divider { width: 1px; height: 24px; background: #3a3a3a; }
+
+        /* Drop zones */
+        .drop-zones {
+            display: flex;
+            gap: 12px;
+        }
+
+        .drop-zone {
+            width: 140px;
+            height: 40px;
+            border: 2px dashed #4a4a4a;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #888;
+            transition: all 0.2s;
+        }
+
+        .drop-zone.dragover { border-color: #00d0ff; background: #00d0ff11; }
+        .drop-zone.has-image { border-color: #3a3a3a; background: #222; border-style: solid; }
+        .drop-zone.has-image::after {
+            content: '✓';
+            color: #00d0ff;
+        }
+
+        .drop-zone.ref-drop.has-image::after { color: #ff4444; }
+
+        /* Canvas container */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #comparisonCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Crop dialog */
+        .dialog-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .dialog-overlay.active { display: flex; }
+
+        .dialog {
+            background: #2a2a2a;
+            border: 1px solid #4a4a4a;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .dialog h2 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            color: #00d0ff;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            justify-content: flex-end;
+        }
+
+        /* Crop canvas */
+        .crop-container {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        #cropCanvas {
+            width: 100%;
+            border: 1px solid #4a4a4a;
+            display: block;
+        }
+
+        .crop-mode-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .crop-legend {
+            font-size: 11px;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        /* Metrics bar */
+        .metrics-bar {
+            background: #2a2a2a;
+            padding: 8px 12px;
+            display: flex;
+            gap: 24px;
+            border-top: 1px solid #3a3a3a;
+            flex-shrink: 0;
+            font-size: 12px;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            color: #888;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 14px;
+            color: #e0e0e0;
+        }
+
+        .metric-value.ref { color: #ff4444; }
+        .metric-value.draw { color: #00d0ff; }
+        .metric-value.neutral { color: #00d0ff; }
+
+        /* Measurement line container */
+        #measurementOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Slider styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 80px;
+            height: 6px;
+            background: #3a3a3a;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #00d0ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slider-label {
+            font-size: 12px;
+            color: #888;
+            min-width: 60px;
+        }
+
+        .slider-value {
+            font-size: 12px;
+            color: #00d0ff;
+            min-width: 30px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="drop-zones">
+            <div class="drop-zone ref-drop" id="refDrop">
+                <span class="drop-text">Reference</span>
+                <input type="file" accept="image/*" id="refInput" style="display:none">
+            </div>
+            <div class="drop-zone draw-drop" id="drawDrop">
+                <span class="drop-text">Drawing</span>
+                <input type="file" accept="image/*" id="drawInput" style="display:none">
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <button class="btn ref" id="cropBtn">📐 Crop Reference</button>
+
+        <div class="divider"></div>
+
+        <div class="btn-group">
+            <button class="btn active" data-mode="wipe">Split Wipe</button>
+            <button class="btn" data-mode="opacity">Opacity Blend</button>
+            <button class="btn" data-mode="onion">Onion Skin</button>
+            <button class="btn" data-mode="edges">Edge Overlay</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="slider-container">
+            <span class="slider-label">Opacity</span>
+            <input type="range" id="opacitySlider" min="0" max="100" value="50">
+            <span class="slider-value" id="opacityValue">50%</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <button class="btn" id="gridToggle">🔲 Grid</button>
+        <button class="btn" id="measureToggle">📏 Measure</button>
+    </div>
+
+    <!-- Canvas Container -->
+    <div class="canvas-container">
+        <canvas id="comparisonCanvas"></canvas>
+        <canvas id="measurementOverlay"></canvas>
+    </div>
+
+    <!-- Crop Dialog -->
+    <div class="dialog-overlay" id="cropDialog">
+        <div class="dialog">
+            <h2>Crop Reference Image</h2>
+            <div class="crop-container">
+                <canvas id="cropCanvas"></canvas>
+            </div>
+            <div class="crop-mode-buttons">
+                <button class="btn active" data-crop="fit">Fit to 9:16</button>
+                <button class="btn" data-crop="fill">Fill 9:16</button>
+                <button class="btn" data-crop="manual">Manual Crop</button>
+            </div>
+            <div class="crop-legend">
+                <span style="color:#ff4444">●</span> Reference • 
+                <span style="color:#00d0ff">●</span> Crop box (9:16 ratio) • 
+                Drag to reposition • Click OK to apply
+            </div>
+            <div class="dialog-buttons">
+                <button class="btn" id="cropCancel">Cancel</button>
+                <button class="btn active" id="cropOK">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Bar -->
+    <div class="metrics-bar">
+        <div class="metric">
+            <span class="metric-label">SSIM</span>
+            <span class="metric-value neutral" id="ssimValue">—</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">MAD (edge)</span>
+            <span class="metric-value neutral" id="madValue">—</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Centroid ΔX</span>
+            <span class="metric-value neutral" id="centroidX">—</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Centroid ΔY</span>
+            <span class="metric-value neutral" id="centroidY">—</span>
+        </div>
+    </div>
+
+    <script>
+    // Global state
+    const TARGET_WIDTH = 1080;
+    const TARGET_HEIGHT = 1920;
+    const PHI = 1.61803398875;
+
+    let state = {
+        referenceImg: null,
+        drawingImg: null,
+        referenceCropped: null,
+        cropMode: 'fit', // 'fit', 'fill', 'manual'
+        cropRect: null, // {x, y, width, height}
+        comparisonMode: 'wipe', // 'wipe', 'opacity', 'onion', 'edges'
+        showGrid: false,
+        measuring: false,
+        measureStart: null,
+        splitPosition: 0.5, // 0-1 for wipe mode
+        opacityValue: 50, // 0-100
+        edgeMapRef: null,
+        edgeMapDraw: null
+    };
+
+    const refDrop = document.getElementById('refDrop');
+    const drawDrop = document.getElementById('drawDrop');
+    const refInput = document.getElementById('refInput');
+    const drawInput = document.getElementById('drawInput');
+    const comparisonCanvas = document.getElementById('comparisonCanvas');
+    const ctx = comparisonCanvas.getContext('2d');
+    const cropDialog = document.getElementById('cropDialog');
+    const cropCanvas = document.getElementById('cropCanvas');
+    const cropCtx = cropCanvas.getContext('2d');
+
+    // URL parameters
+    window.addEventListener('load', () => {
+        const params = new URLSearchParams(window.location.search);
+        const refUrl = params.get('ref');
+        const drawUrl = params.get('draw');
+        if (refUrl) loadRemoteImage(refUrl, 'reference');
+        if (drawUrl) loadRemoteImage(drawUrl, 'drawing');
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+    });
+
+    function resizeCanvas() {
+        const container = document.querySelector('.canvas-container');
+        comparisonCanvas.width = container.clientWidth;
+        comparisonCanvas.height = container.clientHeight;
+        if (state.referenceCropped && state.drawingImg) {
+            drawComparison();
+        }
+    }
+
+    function loadRemoteImage(url, type) {
+        const img = new Image();
+        img.onload = () => {
+            if (type === 'reference') {
+                state.referenceImg = img;
+                showCropDialog();
+            } else if (type === 'drawing') {
+                state.drawingImg = img;
+                state.drawingImg.crossOrigin = 'anonymous';
+                if (state.referenceCropped) drawComparison();
+            }
+            updateDropZones();
+        };
+        img.onerror = () => alert('Failed to load image: ' + url);
+        img.src = url;
+    }
+
+    // Drop zone handlers
+    ['ref', 'draw'].forEach(type => {
+        const drop = type === 'ref' ? refDrop : drawDrop;
+        const input = type === 'ref' ? refInput : drawInput;
+        
+        drop.addEventListener('click', () => input.click());
+        input.addEventListener('change', (e) => handleFile(e.target.files[0], type));
+        
+        drop.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            drop.classList.add('dragover');
+        });
+        drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+        drop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            drop.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file, type);
+        });
+    });
+
+    function handleFile(file, type) {
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                if (type === 'reference') {
+                    state.referenceImg = img;
+                    showCropDialog();
+                } else if (type === 'drawing') {
+                    state.drawingImg = img;
+                    state.drawingImg.crossOrigin = 'anonymous';
+                    if (state.referenceCropped) drawComparison();
+                }
+                updateDropZones();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function updateDropZones() {
+        refDrop.classList.toggle('has-image', !!state.referenceImg);
+        drawDrop.classList.toggle('has-image', !!state.drawingImg);
+    }
+
+    // Crop dialog
+    document.getElementById('cropBtn').addEventListener('click', showCropDialog);
+    document.getElementById('cropCancel').addEventListener('click', () => {
+        cropDialog.classList.remove('active');
+    });
+    document.getElementById('cropOK').addEventListener('click', applyCrop);
+
+    function showCropDialog() {
+        if (!state.referenceImg) return;
+        cropDialog.classList.add('active');
+        setupCropCanvas();
+    }
+
+    function setupCropCanvas() {
+        const img = state.referenceImg;
+        const scale = Math.min(1, 500 / img.width);
+        cropCanvas.width = img.width * scale;
+        cropCanvas.height = img.height * scale;
+        
+        const targetScale = cropCanvas.width / img.width;
+        const targetH = cropCanvas.height / targetScale;
+        
+        // Initialize crop rect
+        if (state.cropMode === 'fit' || state.cropMode === 'fill') {
+            const fitWidth = TARGET_WIDTH * targetScale;
+            const fitHeight = TARGET_HEIGHT * targetScale;
+            
+            if (state.cropMode === 'fit') {
+                // Scale to fit inside, centered
+                const scaleY = Math.min(1, cropCanvas.height / fitHeight);
+                const w = fitWidth * scaleY;
+                const h = fitHeight * scaleY;
+                state.cropRect = {
+                    x: (cropCanvas.width - w) / 2,
+                    y: (cropCanvas.height - h) / 2,
+                    width: w,
+                    height: h
+                };
+            } else {
+                // Scale to fill, center
+                const scaleX = Math.max(1, cropCanvas.width / fitWidth);
+                const w = fitWidth * scaleX;
+                const h = fitHeight * scaleX;
+                state.cropRect = {
+                    x: (cropCanvas.width - w) / 2,
+                    y: (cropCanvas.height - h) / 2,
+                    width: w,
+                    height: h
+                };
+            }
+        } else {
+            // Manual - start with center 9:16 box
+            const w = cropCanvas.width * 0.6;
+            const h = w / 9 * 16;
+            state.cropRect = {
+                x: (cropCanvas.width - w) / 2,
+                y: (cropCanvas.height - h) / 2,
+                width: w,
+                height: h
+            };
+        }
+        
+        drawCropOverlay();
+        
+        // Mouse handlers
+        let isDragging = false;
+        let dragStart = null;
+        
+        cropCanvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            dragStart = { x: e.offsetX - state.cropRect.x, y: e.offsetY - state.cropRect.y };
+        });
+        
+        cropCanvas.addEventListener('mousemove', (e) => {
+            if (!isDragging || !state.cropRect) return;
+            state.cropRect.x = e.offsetX - dragStart.x;
+            state.cropRect.y = e.offsetY - dragStart.y;
+            drawCropOverlay();
+        });
+        
+        cropCanvas.addEventListener('mouseup', () => isDragging = false);
+        cropCanvas.addEventListener('mouseleave', () => isDragging = false);
+        
+        // Touch support
+        cropCanvas.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            const rect = cropCanvas.getBoundingClientRect();
+            isDragging = true;
+            dragStart = { 
+                x: (touch.clientX - rect.left) - state.cropRect.x,
+                y: (touch.clientY - rect.top) - state.cropRect.y 
+            };
+            e.preventDefault();
+        });
+        
+        cropCanvas.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            const touch = e.touches[0];
+            const rect = cropCanvas.getBoundingClientRect();
+            state.cropRect.x = (touch.clientX - rect.left) - dragStart.x;
+            state.cropRect.y = (touch.clientY - rect.top) - dragStart.y;
+            drawCropOverlay();
+            e.preventDefault();
+        });
+        
+        cropCanvas.addEventListener('touchend', () => isDragging = false);
+    }
+
+    function drawCropOverlay() {
+        cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+        
+        // Draw original image
+        cropCtx.drawImage(state.referenceImg, 0, 0, cropCanvas.width, cropCanvas.height);
+        cropCtx.globalAlpha = 0.5;
+        
+        // Darken outside crop area
+        cropCtx.fillStyle = 'rgba(0,0,0,0.7)';
+        cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+        
+        // Draw crop rectangle
+        cropCtx.globalAlpha = 1;
+        cropCtx.strokeStyle = '#00d0ff';
+        cropCtx.lineWidth = 2;
+        cropCtx.setLineDash([10, 5]);
+        cropCtx.strokeRect(
+            state.cropRect.x,
+            state.cropRect.y,
+            state.cropRect.width,
+            state.cropRect.height
+        );
+        cropCtx.setLineDash([]);
+        
+        // Corner handles
+        cropCtx.fillStyle = '#00d0ff';
+        const handleSize = 8;
+        const corners = [
+            [state.cropRect.x, state.cropRect.y],
+            [state.cropRect.x + state.cropRect.width, state.cropRect.y],
+            [state.cropRect.x, state.cropRect.y + state.cropRect.height],
+            [state.cropRect.x + state.cropRect.width, state.cropRect.y + state.cropRect.height]
+        ];
+        corners.forEach(([cx, cy]) => {
+            cropCtx.fillRect(cx - handleSize/2, cy - handleSize/2, handleSize, handleSize);
+        });
+    }
+
+    function applyCrop() {
+        if (!state.cropRect) return;
+        
+        // Create cropped image at 1080x1920
+        const croppedCanvas = document.createElement('canvas');
+        croppedCanvas.width = TARGET_WIDTH;
+        croppedCanvas.height = TARGET_HEIGHT;
+        const c = croppedCanvas.getContext('2d');
+        
+        // Calculate source dimensions based on crop mode
+        const sourceW = state.cropRect.width;
+        const sourceH = state.cropRect.height;
+        const targetScale = sourceW / state.cropRect.width;
+        const origW = state.cropRect.width / targetScale;
+        const origH = state.cropRect.height / targetScale;
+        
+        let srcX, srcY, srcW, srcH;
+        
+        if (state.cropMode === 'fit' || state.cropMode === 'fill') {
+            const fitScale = state.cropMode === 'fit' 
+                ? Math.min(TARGET_WIDTH/origW, TARGET_HEIGHT/origH)
+                : Math.max(TARGET_WIDTH/origW, TARGET_HEIGHT/origH);
+            
+            srcW = origW * fitScale;
+            srcH = origH * fitScale;
+            srcX = (origW - srcW) / 2;
+            srcY = (origH - srcH) / 2;
+        } else {
+            srcX = state.cropRect.x;
+            srcY = state.cropRect.y;
+            srcW = state.cropRect.width;
+            srcH = state.cropRect.height;
+        }
+        
+        // Draw cropped and resized
+        c.drawImage(
+            state.referenceImg,
+            srcX, srcY, srcW, srcH,
+            0, 0, TARGET_WIDTH, TARGET_HEIGHT
+        );
+        
+        state.referenceCropped = croppedCanvas;
+        cropDialog.classList.remove('active');
+        
+        if (state.drawingImg) drawComparison();
+    }
+
+    // Mode switching
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.classList.contains('active')) return;
+            document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.comparisonMode = btn.dataset.mode;
+            updateSliderVisibility();
+            if (state.referenceCropped && state.drawingImg) drawComparison();
+        });
+    });
+
+    document.getElementById('gridToggle').addEventListener('click', (e) => {
+        state.showGrid = !state.showGrid;
+        e.target.classList.toggle('active', state.showGrid);
+        if (state.referenceCropped && state.drawingImg) drawComparison();
+    });
+
+    document.getElementById('measureToggle').addEventListener('click', (e) => {
+        state.measuring = !state.measuring;
+        e.target.classList.toggle('active', state.measuring);
+        if (!state.measuring) {
+            state.measureStart = null;
+        }
+        if (state.referenceCropped && state.drawingImg) drawComparison();
+    });
+
+    document.getElementById('opacitySlider').addEventListener('input', (e) => {
+        state.opacityValue = parseInt(e.target.value);
+        document.getElementById('opacityValue').textContent = state.opacityValue + '%';
+        if (state.referenceCropped && state.drawingImg) drawComparison();
+    });
+
+    function updateSliderVisibility() {
+        const slider = document.getElementById('opacitySlider');
+        slider.style.display = (state.comparisonMode === 'opacity' || state.comparisonMode === 'onion') ? 'block' : 'none';
+    }
+
+    // Draw comparison
+    function drawComparison() {
+        const w = comparisonCanvas.width;
+        const h = comparisonCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+        
+        const imgW = TARGET_WIDTH;
+        const imgH = TARGET_HEIGHT;
+        const scaleX = w / imgW;
+        const scaleY = h / imgH;
+        const scale = Math.min(scaleX, scaleY);
+        const drawW = imgW * scale;
+        const drawH = imgH * scale;
+        const offsetX = (w - drawW) / 2;
+        const offsetY = (h - drawH) / 2;
+        
+        if (state.comparisonMode === 'wipe') {
+            drawSplitWipe(offsetX, offsetY, drawW, drawH);
+        } else if (state.comparisonMode === 'opacity') {
+            drawOpacityBlend(offsetX, offsetY, drawW, drawH);
+        } else if (state.comparisonMode === 'onion') {
+            drawOnionSkin(offsetX, offsetY, drawW, drawH);
+        } else if (state.comparisonMode === 'edges') {
+            drawEdgeOverlay(offsetX, offsetY, drawW, drawH);
+        }
+        
+        if (state.showGrid) drawGrid(offsetX, offsetY, drawW, drawH);
+        if (state.measureStart) drawMeasurement(offsetX, offsetY, drawW, drawH);
+    }
+
+    function drawSplitWipe(offsetX, offsetY, w, h) {
+        const splitX = offsetX + w * state.splitPosition;
+        
+        // Drawing (right)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(splitX, offsetY, w * (1 - state.splitPosition), h);
+        ctx.clip();
+        ctx.drawImage(state.drawingImg, offsetX, offsetY, w, h);
+        ctx.restore();
+        
+        // Reference (left)
+        ctx.drawImage(state.referenceCropped, offsetX, offsetY, w, h);
+        
+        // Divider line
+        ctx.strokeStyle = '#ff4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(splitX, offsetY);
+        ctx.lineTo(splitX, offsetY + h);
+        ctx.stroke();
+    }
+
+    function drawOpacityBlend(offsetX, offsetY, w, h) {
+        const alpha = state.opacityValue / 100;
+        
+        ctx.drawImage(state.drawingImg, offsetX, offsetY, w, h);
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(state.referenceCropped, offsetX, offsetY, w, h);
+        ctx.globalAlpha = 1;
+    }
+
+    function drawOnionSkin(offsetX, offsetY, w, h) {
+        const refAlpha = 0.3; // Reference at 30%
+        
+        ctx.drawImage(state.drawingImg, offsetX, offsetY, w, h);
+        ctx.globalAlpha = refAlpha;
+        ctx.drawImage(state.referenceCropped, offsetX, offsetY, w, h);
+        ctx.globalAlpha = 1;
+    }
+
+    function drawEdgeOverlay(offsetX, offsetY, w, h) {
+        if (!state.edgeMapRef || !state.edgeMapDraw) {
+            const [refEdges, drawEdges] = computeEdgeMaps(state.referenceCropped, state.drawingImg);
+            state.edgeMapRef = refEdges;
+            state.edgeMapDraw = drawEdges;
+            computeMetrics(refEdges, drawEdges);
+        }
+        
+        const refEdges = state.edgeMapRef;
+        const drawEdges = state.edgeMapDraw;
+        
+        // Create composite edge image
+        const composite = document.createElement('canvas');
+        composite.width = TARGET_WIDTH;
+        composite.height = TARGET_HEIGHT;
+        const c = composite.getContext('2d');
+        
+        c.fillStyle = '#000';
+        c.fillRect(0, 0, composite.width, composite.height);
+        
+        // Draw edges with color coding
+        for (let i = 0; i < refEdges.data.length; i += 4) {
+            const refVal = refEdges.data[i];
+            const drawVal = drawEdges.data[i];
+            
+            if (refVal > 30 && drawVal > 30) {
+                // Both - white
+                c.fillStyle = '#ffffff';
+            } else if (refVal > 30) {
+                // Reference only - red
+                c.fillStyle = '#ff4444';
+            } else if (drawVal > 30) {
+                // Drawing only - cyan
+                c.fillStyle = '#00d0ff';
+            }
+            
+            const x = (i / 4) % composite.width;
+            const y = Math.floor((i / 4) / composite.width);
+            c.fillRect(x, y, 1, 1);
+        }
+        
+        // Draw scaled
+        ctx.drawImage(composite, offsetX, offsetY, w, h);
+    }
+
+    function drawGrid(offsetX, offsetY, w, h) {
+        ctx.strokeStyle = 'rgba(0, 208, 255, 0.3)';
+        ctx.lineWidth = 1;
+        
+        const lines = [
+            { type: 'v', pos: 1/PHI },
+            { type: 'v', pos: 0.5 },
+            { type: 'v', pos: (PHI - 1)/PHI },
+            { type: 'h', pos: 1/PHI },
+            { type: 'h', pos: 0.5 },
+            { type: 'h', pos: (PHI - 1)/PHI }
+        ];
+        
+        lines.forEach(line => {
+            const pos = line.pos * (line.type === 'v' ? w : h);
+            const absolute = offsetX + pos;
+            
+            ctx.beginPath();
+            if (line.type === 'v') {
+                ctx.moveTo(absolute, offsetY);
+                ctx.lineTo(absolute, offsetY + h);
+            } else {
+                ctx.moveTo(offsetX, absolute);
+                ctx.lineTo(offsetX + w, absolute);
+            }
+            ctx.stroke();
+        });
+    }
+
+    function drawMeasurement(offsetX, offsetY, w, h) {
+        const canvas = document.getElementById('measurementOverlay');
+        const c = canvas.getContext('2d');
+        canvas.width = comparisonCanvas.width;
+        canvas.height = comparisonCanvas.height;
+        
+        c.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (state.measureStart) {
+            c.strokeStyle = '#00d0ff';
+            c.lineWidth = 2;
+            c.setLineDash([5, 3]);
+            c.beginPath();
+            c.moveTo(state.measureStart.x, state.measureStart.y);
+            c.lineTo(state.measureStart.x, offsetY);
+            c.lineTo(offsetX, offsetY);
+            c.stroke();
+            c.setLineDash([]);
+            
+            // Dimension text
+            c.fillStyle = '#00d0ff';
+            c.font = '12px monospace';
+            const dist = Math.sqrt(
+                Math.pow(state.measureStart.x - offsetX, 2) + 
+                Math.pow(state.measureStart.y - offsetY, 2)
+            );
+            c.fillText(`${dist.toFixed(0)} px`, state.measureStart.x + 10, state.measureStart.y - 10);
+        }
+    }
+
+    comparisonCanvas.addEventListener('mousedown', (e) => {
+        if (!state.referenceCropped) return;
+        const rect = comparisonCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        if (state.comparisonMode === 'wipe') {
+            const w = TARGET_WIDTH * Math.min(rect.width / TARGET_WIDTH, rect.height / TARGET_HEIGHT);
+            const h = TARGET_HEIGHT * Math.min(rect.width / TARGET_WIDTH, rect.height / TARGET_HEIGHT);
+            const offsetX = (rect.width - w) / 2;
+            state.splitPosition = Math.max(0, Math.min(1, (x - offsetX) / w));
+            drawComparison();
+        } else if (state.measuring) {
+            if (!state.measureStart) {
+                state.measureStart = { x, y };
+            } else {
+                // Compute measurement
+                const dist = Math.sqrt(Math.pow(x - state.measureStart.x, 2) + Math.pow(y - state.measureStart.y, 2));
+                const angle = Math.atan2(y - state.measureStart.y, x - state.measureStart.x) * 180 / Math.PI;
+                console.log(`Measurement: ${dist.toFixed(1)} px, ${angle.toFixed(1)}°`);
+                state.measureStart = null;
+            }
+            drawComparison();
+        }
+    });
+
+    // Edge detection using Sobel
+    function computeEdgeMaps(img1, img2) {
+        const w = TARGET_WIDTH;
+        const h = TARGET_HEIGHT;
+        
+        const createEdgeMap = (img) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const c = canvas.getContext('2d');
+            c.drawImage(img, 0, 0, w, h);
+            const imageData = c.getImageData(0, 0, w, h);
+            const data = imageData.data;
+            
+            const gray = new Float32Array(w * h);
+            for (let i = 0; i < data.length; i += 4) {
+                gray[Math.floor(i/4)] = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+            }
+            
+            const sobelX = [-1,0,1,-2,0,2,-1,0,1];
+            const sobelY = [-1,-2,-1,0,0,0,1,2,1];
+            const edges = new Uint8ClampedArray(w * h);
+            
+            for (let y = 1; y < h-1; y++) {
+                for (let x = 1; x < w-1; x++) {
+                    let gx = 0, gy = 0;
+                    for (let ky = 0; ky < 3; ky++) {
+                        for (let kx = 0; kx < 3; kx++) {
+                            const idx = (y + ky - 1) * w + (x + kx - 1);
+                            gx += sobelX[ky*3+kx] * gray[idx];
+                            gy += sobelY[ky*3+kx] * gray[idx];
+                        }
+                    }
+                    const mag = Math.sqrt(gx*gx + gy*gy);
+                    edges[y*w + x] = mag > 30 ? 255 : 0;
+                }
+            }
+            
+            return {
+                data: new Uint8ClampedArray(w * h * 4).map((_, i) => edges[i] ? 255 : 0)
+            };
+        };
+        
+        return [createEdgeMap(img1), createEdgeMap(img2)];
+    }
+
+    // SSIM calculation on edge maps
+    function computeMetrics(edge1, edge2) {
+        const data1 = edge1.data;
+        const data2 = edge2.data;
+        const n = data1.length / 4;
+        
+        // Simplified SSIM using 8x8 blocks
+        let ssimSum = 0;
+        let count = 0;
+        const blockSize = 8;
+        
+        for (let by = 0; by < 240; by += blockSize) {
+            for (let bx = 0; bx < 135; bx += blockSize) {
+                let sum1 = 0, sum2 = 0, sum1sq = 0, sum2sq = 0, sum12 = 0;
+                
+                for (let y = 0; y < blockSize && by+y < 240; y++) {
+                    for (let x = 0; x < blockSize && bx+x < 135; x++) {
+                        const i = (by+y)*135 + (bx+x);
+                        const v1 = data1[i*4];
+                        const v2 = data2[i*4];
+                        sum1 += v1; sum2 += v2;
+                        sum1sq += v1*v1; sum2sq += v2*v2;
+                        sum12 += v1*v2;
+                    }
+                }
+                
+                const N = Math.min(blockSize, 240-by) * Math.min(blockSize, 135-bx);
+                const mu1 = sum1/N, mu2 = sum2/N;
+                const sigma1_sq = (sum1sq/N - mu1*mu1) || 0;
+                const sigma2_sq = (sum2sq/N - mu2*mu2) || 0;
+                const sigma12 = (sum12/N - mu1*mu2) || 0;
+                
+                const C1 = 6.5, C2 = 58.5;
+                const ssim = ((2*mu1*mu2 + C1)*(2*sigma12 + C2))/
+                    ((mu1*mu1 + mu2*mu2 + C1)*(sigma1_sq + sigma2_sq + C2));
+                
+                ssimSum += ssim;
+                count++;
+            }
+        }
+        
+        const ssim = count > 0 ? ssimSum/count : 0;
+        
+        // Mean Absolute Deviation
+        let madSum = 0;
+        for (let i = 0; i < n; i++) {
+            madSum += Math.abs(data1[i*4] - data2[i*4]);
+        }
+        const mad = madSum / n;
+        
+        // Centroid offset
+        let x1=0, y1=0, total1=0, x2=0, y2=0, total2=0;
+        for (let i = 0; i < n; i++) {
+            const x = i % 135, y = Math.floor(i/135);
+            if (data1[i*4] > 0) { x1 += x; y1 += y; total1++; }
+            if (data2[i*4] > 0) { x2 += x; y2 += y; total2++; }
+        }
+        
+        const cx1 = total1 ? x1/total1 : 0, cy1 = total1 ? y1/total1 : 0;
+        const cx2 = total2 ? x2/total2 : 0, cy2 = total2 ? y2/total2 : 0;
+        
+        const centroidX = cx2 - cx1;
+        const centroidY = cy2 - cy1;
+        
+        // Update UI
+        document.getElementById('ssimValue').textContent = ssim.toFixed(3);
+        document.getElementById('madValue').textContent = mad.toFixed(1);
+        document.getElementById('centroidX').textContent = centroidX.toFixed(1);
+        document.getElementById('centroidY').textContent = centroidY.toFixed(1);
+    }
+    
+    updateSliderVisibility();
+    </script>
+</body>
+</html>

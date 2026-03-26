@@ -1,0 +1,1128 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Traced - Architectural Keypoint Extraction</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 0;
+            min-height: 100vh;
+        }
+        
+        .main-panel {
+            position: relative;
+            background: #000;
+        }
+        
+        .side-panel {
+            background: #1a1a1a;
+            border-left: 1px solid #333;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+        
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+        
+        .toolbar-btn {
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        
+        .toolbar-btn:hover {
+            background: #444;
+        }
+        
+        .toolbar-btn.active {
+            background: #00d4ff;
+            color: #000;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #mainCanvas {
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        }
+        
+        .panel {
+            padding: 16px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .panel:last-child {
+            border-bottom: none;
+        }
+        
+        .panel-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #888;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+        
+        .keypoints-list, .groups-list {
+            font-size: 13px;
+        }
+        
+        .keypoint-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #222;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            border-left: 3px solid #00d4ff;
+        }
+        
+        .group-item {
+            padding: 8px;
+            background: #222;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        .group-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .group-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .group-members {
+            font-size: 11px;
+            color: #888;
+            padding-left: 20px;
+        }
+        
+        .input-text {
+            background: #222;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 100%;
+        }
+        
+        .input-text:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        
+        .btn {
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            min-width: 80px;
+        }
+        
+        .btn:hover {
+            background: #444;
+        }
+        
+        .btn-primary {
+            background: #00d4ff;
+            color: #000;
+        }
+        
+        .btn-primary:hover {
+            background: #00b8e6;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        
+        th {
+            background: #222;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #888;
+        }
+        
+        tr:hover {
+            background: #222;
+        }
+        
+        .match-strong { background: rgba(74, 222, 128, 0.2); }
+        .match-possible { background: rgba(250, 204, 21, 0.2); }
+        .match-none { background: rgba(255, 255, 255, 0.05); }
+        
+        .match-icon {
+            font-weight: bold;
+            color: #4ade80;
+        }
+        
+        .code-panel {
+            background: #0d0d0d;
+            padding: 16px;
+        }
+        
+        .code-output {
+            background: #000;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 12px;
+            color: #e0e0e0;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .code-comment { color: #6a9955; }
+        .code-var { color: #569cd6; }
+        .code-number { color: #b5cea8; }
+        
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .input-group .input-text {
+            flex: 1;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 12px;
+            padding: 8px 16px;
+            background: #222;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .dropzone {
+            padding: 60px 20px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+            
+            .main-panel {
+                order: 1;
+            }
+            
+            .side-panel {
+                order: 2;
+                max-height: 50vh;
+            }
+            
+            .panel {
+                padding: 12px;
+            }
+            
+            .toolbar-btn {
+                font-size: 11px;
+                padding: 6px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-panel">
+            <div class="toolbar">
+                <label class="toolbar-btn">
+                    📷 Load Image
+                    <input type="file" class="file-input" accept="image/*" onchange="loadImage(this)">
+                </label>
+                <button class="toolbar-btn" onclick="saveKeypoints()">💾 Save JSON</button>
+                <label class="toolbar-btn">
+                    📂 Load JSON
+                    <input type="file" class="file-input" accept="application/json" onchange="loadKeypoints(this)">
+                </label>
+                <button class="toolbar-btn" id="overlayφ" onclick="toggleOverlay('φgrid')">📐 Grid: φ</button>
+                <button class="toolbar-btn" id="overlay⅓" onclick="toggleOverlay('grid⅓')">📐 Grid: ⅓</button>
+                <button class="toolbar-btn" id="overlaycenter" onclick="toggleOverlay('center')">⊕ Center</button>
+                <button class="toolbar-btn" id="overlaysym" onclick="toggleOverlay('symmetry')">〰️ Symmetry</button>
+            </div>
+            <div id="canvas-container">
+                <canvas id="mainCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="side-panel">
+            <div class="panel">
+                <div class="panel-title">Keypoints</div>
+                <div class="keypoints-list" id="keypointsList"></div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Element Groups</div>
+                <div class="input-group">
+                    <input type="text" class="input-text" id="newGroupName" placeholder="Group name">
+                    <button class="toolbar-btn" onclick="createGroup()">+</button>
+                </div>
+                <div class="groups-list" id="groupsList"></div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Proportional Analysis</div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Element A</th>
+                                <th>Element B</th>
+                                <th>Ratio</th>
+                                <th>Match</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analysisTable"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">Generated Code</div>
+                <div class="code-panel">
+                    <div class="code-output" id="codeOutput"></div>
+                    <button class="toolbar-btn btn-primary" onclick="copyCode()">📋 Copy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        
+        let image = null;
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let dragStartX, dragStartY;
+        let zoomStartScale = 1;
+        let lastPinchDistance = null;
+        let selectedKeypoint = null;
+        let newKeypointName = null;
+        const keypointColors = [
+            '#00d4ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff',
+            '#f72585', '#7209b7', '#560bad', '#3a0ca3', '#4361ee'
+        ];
+        const goldenValues = {
+            'φ': 1.61803398875,
+            '1/φ': 0.61803398875,
+            'φ²': 2.61803398875,
+            '1/φ²': 0.38196601125,
+            '√2': 1.41421356237,
+            '1/√2': 0.70710678119,
+            '√3': 1.73205080757,
+            '√5': 2.2360679775,
+            '2': 2,
+            '3': 3,
+            '1/2': 0.5,
+            '1/3': 0.33333333333,
+            '1/4': 0.25,
+            '2/3': 0.66666666667,
+            '3/4': 0.75,
+            'π/2': 1.57079632679,
+            'π/3': 1.0471975512,
+            'π/4': 0.7853981634
+        };
+        
+        let keypoints = [];
+        let groups = [];
+        let overlays = {
+            'φgrid': false,
+            'grid⅓': false,
+            'center': false,
+            'symmetry': false,
+            'circle': false
+        };
+        let nextKeypointId = 1;
+        let nextGroupId = 1;
+        
+        // Canvas sizing
+        function resizeCanvas() {
+            if (!image) return;
+            const containerRect = container.getBoundingClientRect();
+            const maxW = containerRect.width - 40;
+            const maxH = containerRect.height - 40;
+            const ratio = Math.min(maxW / image.width, maxH / image.height);
+            scale = ratio;
+            offsetX = (containerRect.width - image.width * scale) / 2;
+            offsetY = (containerRect.height - image.height * scale) / 2;
+            canvas.width = containerRect.width;
+            canvas.height = containerRect.height;
+            draw();
+        }
+        
+        // Image loading
+        function loadImage(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    image = img;
+                    resizeCanvas();
+                    keypoints = [];
+                    groups = [];
+                    nextKeypointId = 1;
+                    nextGroupId = 1;
+                    updateUI();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Canvas coordinate conversion
+        function screenToCanvas(screenX, screenY) {
+            return {
+                x: (screenX - offsetX) / scale,
+                y: (screenY - offsetY) / scale
+            };
+        }
+        
+        // Canvas-to-image conversion
+        function canvasToImage(canvasX, canvasY) {
+            if (!image) return null;
+            return {
+                x: canvasX,
+                y: canvasY,
+                xPercent: (canvasX / image.width) * 100,
+                yPercent: (canvasY / image.height) * 100
+            };
+        }
+        
+        // Event handlers
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        canvas.addEventListener('contextmenu', handleContextMenu);
+        
+        // Touch events
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd);
+        
+        // Mouse handlers
+        function handleMouseDown(e) {
+            const pos = screenToCanvas(e.clientX, e.clientY);
+            const imgPos = canvasToImage(pos.x, pos.y);
+            if (!imgPos) return;
+            
+            // Check keypoint click
+            const hitKeypoint = keypoints.find(kp => {
+                const dx = kp.x - imgPos.x;
+                const dy = kp.y - imgPos.y;
+                return Math.sqrt(dx*dx + dy*dy) < 12 / scale;
+            });
+            
+            if (hitKeypoint) {
+                // Rename existing keypoint
+                newKeypointName = hitKeypoint;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = hitKeypoint.name;
+                input.className = 'input-text';
+                input.style.position = 'absolute';
+                input.style.left = (e.clientX + 10) + 'px';
+                input.style.top = (e.clientY + 10) + 'px';
+                input.style.zIndex = '1000';
+                input.focus();
+                document.body.appendChild(input);
+                
+                const saveRename = () => {
+                    hitKeypoint.name = input.value || 'Point ' + hitKeypoint.id;
+                    input.remove();
+                    input.removeEventListener('blur', saveRename);
+                    input.removeEventListener('keydown', handleRenameKeydown);
+                    draw();
+                    updateUI();
+                };
+                
+                const handleRenameKeydown = (ev) => {
+                    if (ev.key === 'Enter') saveRename();
+                    if (ev.key === 'Escape') input.remove();
+                };
+                
+                input.addEventListener('blur', saveRename);
+                input.addEventListener('keydown', handleRenameKeydown);
+            } else {
+                // Start drag or create new
+                if (e.button === 0) {
+                    isDragging = true;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                }
+            }
+            draw();
+        }
+        
+        function handleMouseMove(e) {
+            if (isDragging && image) {
+                const dx = e.clientX - dragStartX;
+                const dy = e.clientY - dragStartY;
+                offsetX += dx;
+                offsetY += dy;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                draw();
+            }
+            if (newKeypointName) {
+                const input = document.querySelector('.input-text');
+                if (input) {
+                    input.style.left = (e.clientX + 10) + 'px';
+                    input.style.top = (e.clientY + 10) + 'px';
+                }
+            }
+        }
+        
+        function handleMouseUp(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            const pos = screenToCanvas(e.clientX, e.clientY);
+            const imgPos = canvasToImage(pos.x, pos.y);
+            if (imgPos && Math.abs(e.clientX - dragStartX) < 5 && Math.abs(e.clientY - dragStartY) < 5) {
+                // Create new keypoint
+                const kp = {
+                    id: nextKeypointId++,
+                    name: 'Point ' + nextKeypointId,
+                    x: imgPos.x,
+                    y: imgPos.y,
+                    groupId: null,
+                    color: keypointColors[(nextKeypointId - 1) % keypointColors.length]
+                };
+                keypoints.push(kp);
+                updateUI();
+            }
+            draw();
+        }
+        
+        function handleWheel(e) {
+            e.preventDefault();
+            const zoomIntensity = 0.1;
+            const wheel = e.deltaY < 0 ? 1 : -1;
+            const zoom = Math.exp(wheel * zoomIntensity);
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const beforeX = (mouseX - offsetX) / scale;
+            const beforeY = (mouseY - offsetY) / scale;
+            
+            scale *= zoom;
+            
+            const newOffsetX = mouseX - beforeX * scale;
+            const newOffsetY = mouseY - beforeY * scale;
+            
+            const maxScale = Math.max(
+                canvas.width / image.width,
+                canvas.height / image.height
+            );
+            scale = Math.min(scale, maxScale);
+            
+            offsetX = newOffsetX;
+            offsetY = newOffsetY;
+            
+            draw();
+        }
+        
+        function handleContextMenu(e) {
+            e.preventDefault();
+            const pos = screenToCanvas(e.clientX, e.clientY);
+            const imgPos = canvasToImage(pos.x, pos.y);
+            if (!imgPos) return;
+            
+            const hitKeypoint = keypoints.find(kp => {
+                const dx = kp.x - imgPos.x;
+                const dy = kp.y - imgPos.y;
+                return Math.sqrt(dx*dx + dy*dy) < 12 / scale;
+            });
+            
+            if (hitKeypoint) {
+                keypoints = keypoints.filter(kp => kp !== hitKeypoint);
+                // Remove from groups
+                groups.forEach(g => {
+                    g.keypointIds = g.keypointIds.filter(id => id !== hitKeypoint.id);
+                });
+                updateUI();
+                draw();
+            }
+        }
+        
+        // Touch handlers
+        function handleTouchStart(e) {
+            if (e.touches.length === 2) {
+                lastPinchDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+            } else if (e.touches.length === 1) {
+                handleMouseDown(e.touches[0]);
+            }
+        }
+        
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (e.touches.length === 2) {
+                const distance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                if (lastPinchDistance) {
+                    const delta = distance / lastPinchDistance;
+                    scale *= delta;
+                    lastPinchDistance = distance;
+                }
+            } else if (e.touches.length === 1) {
+                handleMouseMove(e.touches[0]);
+            }
+        }
+        
+        function handleTouchEnd(e) {
+            if (e.touches.length === 1) {
+                handleMouseUp(e.changedTouches[0]);
+            }
+            lastPinchDistance = null;
+        }
+        
+        // Drawing
+        function draw() {
+            if (!image) {
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#444';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Click to load an image', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, offsetX, offsetY, image.width * scale, image.height * scale);
+            
+            // Draw overlays
+            if (overlays['φgrid']) drawGoldenGrid();
+            if (overlays['grid⅓']) drawThirdsGrid();
+            if (overlays['center']) drawCenterCrosshair();
+            if (overlays['symmetry']) drawSymmetryLine();
+            if (overlays['circle']) drawCircumcircle();
+            
+            // Draw keypoints
+            keypoints.forEach(kp => drawKeypoint(kp));
+            
+            // Highlight new name input
+            if (newKeypointName) {
+                const pos = canvasToImage(newKeypointName.x, newKeypointName.y);
+                const screenX = offsetX + pos.x * scale;
+                const screenY = offsetY + pos.y * scale;
+            }
+        }
+        
+        function drawKeypoint(kp) {
+            const pos = canvasToImage(kp.x, kp.y);
+            const screenX = offsetX + pos.x * scale;
+            const screenY = offsetY + pos.y * scale;
+            const radius = 6 * scale;
+            
+            // Glow effect
+            ctx.shadowColor = kp.color;
+            ctx.shadowBlur = 10 * scale;
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#00d4ff';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // White border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2 * scale;
+            ctx.stroke();
+            
+            // Label
+            ctx.fillStyle = '#fff';
+            ctx.font = Math.max(11, 12 * scale) + 'px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(kp.name, screenX + radius + 4, screenY + 4);
+        }
+        
+        function drawGoldenGrid() {
+            const golden = 1.61803398875;
+            const divisions = 1 + golden + golden * golden;
+            const lines = [-1, -golden, -golden*golden, 0, golden*golden, golden, 1];
+            const color = 'rgba(0, 212, 255, 0.3)';
+            
+            lines.forEach(v => {
+                if (Math.abs(v) > 1) return;
+                const x = offsetX + v * image.width * scale / golden;
+                if (x > 0 && x < canvas.width) {
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(x, offsetY);
+                    ctx.lineTo(x, offsetY + image.height * scale);
+                    ctx.stroke();
+                }
+                const y = offsetY + v * image.height * scale / golden;
+                if (y > 0 && y < canvas.height) {
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(offsetX, y);
+                    ctx.lineTo(offsetX + image.width * scale, y);
+                    ctx.stroke();
+                }
+            });
+        }
+        
+        function drawThirdsGrid() {
+            const lines = [1/3, 2/3];
+            const color = 'rgba(74, 222, 128, 0.3)';
+            
+            lines.forEach(v => {
+                const x = offsetX + v * image.width * scale;
+                if (x > 0 && x < canvas.width) {
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(x, offsetY);
+                    ctx.lineTo(x, offsetY + image.height * scale);
+                    ctx.stroke();
+                }
+                const y = offsetY + v * image.height * scale;
+                if (y > 0 && y < canvas.height) {
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(offsetX, y);
+                    ctx.lineTo(offsetX + image.width * scale, y);
+                    ctx.stroke();
+                }
+            });
+        }
+        
+        function drawCenterCrosshair() {
+            const cx = offsetX + image.width * scale / 2;
+            const cy = offsetY + image.height * scale / 2;
+            const color = 'rgba(255, 255, 0, 0.5)';
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(offsetX + image.width * scale / 2, offsetY);
+            ctx.lineTo(offsetX + image.width * scale / 2, offsetY + image.height * scale);
+            ctx.moveTo(offsetX, offsetY + image.height * scale / 2);
+            ctx.lineTo(offsetX + image.width * scale, offsetY + image.height * scale / 2);
+            ctx.stroke();
+            
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function drawSymmetryLine() {
+            const cx = offsetX + image.width * scale / 2;
+            ctx.strokeStyle = 'rgba(255, 100, 100, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, offsetY);
+            ctx.lineTo(cx, offsetY + image.height * scale);
+            ctx.stroke();
+        }
+        
+        function drawCircumcircle() {
+            if (keypoints.length < 3) return;
+            const kp1 = keypoints[0];
+            const kp2 = keypoints[1];
+            const kp3 = keypoints[2];
+            
+            const x1 = kp1.x, y1 = kp1.y;
+            const x2 = kp2.x, y2 = kp2.y;
+            const x3 = kp3.x, y3 = kp3.y;
+            
+            const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+            if (Math.abs(D) < 0.0001) return;
+            
+            const Ux = ((x1*x1 + y1*y1) * (y2 - y3) + (x2*x2 + y2*y2) * (y3 - y1) + (x3*x3 + y3*y3) * (y1 - y2)) / D;
+            const Uy = ((x1*x1 + y1*y1) * (x3 - x2) + (x2*x2 + y2*y2) * (x1 - x3) + (x3*x3 + y3*y3) * (x2 - x1)) / D;
+            const radius = Math.sqrt((x1 - Ux)*(x1 - Ux) + (y1 - Uy)*(y1 - Uy));
+            
+            const cx = offsetX + Ux * scale;
+            const cy = offsetY + Uy * scale;
+            const cr = radius * scale;
+            
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Proportional analysis
+        function computeRatio(a, b) {
+            if (Math.abs(a) < 0.001 || Math.abs(b) < 0.001) return null;
+            return a / b;
+        }
+        
+        function findClosestMatch(ratio) {
+            let closest = null;
+            let minError = Infinity;
+            
+            for (const [name, value] of Object.entries(goldenValues)) {
+                const error = Math.abs(ratio / value - 1);
+                if (error < minError) {
+                    minError = error;
+                    closest = { name, error };
+                }
+            }
+            
+            return closest;
+        }
+        
+        function getPositionFraction(posPercent) {
+            for (const [name, value] of Object.entries(goldenValues)) {
+                const absValue = Math.abs(value);
+                const error = Math.abs(posPercent / 100 / absValue - 1);
+                if (error < 0.05) {
+                    return { value: 1/value, name };
+                }
+            }
+            return null;
+        }
+        
+        function analyzeProportions() {
+            if (keypoints.length < 2) return [];
+            
+            const results = [];
+            
+            for (let i = 0; i < keypoints.length; i++) {
+                for (let j = i + 1; j < keypoints.length; j++) {
+                    const kp1 = keypoints[i];
+                    const kp2 = keypoints[j];
+                    
+                    const width = Math.abs(kp2.x - kp1.x);
+                    const height = Math.abs(kp2.y - kp1.y);
+                    const distance = Math.sqrt(Math.pow(kp2.x - kp1.x, 2) + Math.pow(kp2.y - kp1.y, 2));
+                    
+                    if (width > 100) {
+                        const ratio = width / image.width * 100;
+                        const match = findClosestMatch(ratio);
+                        if (match) {
+                            results.push({
+                                a: kp1.name,
+                                b: kp2.name,
+                                metric: 'horizontal distance',
+                                value: (width / image.width * 100).toFixed(2) + '%',
+                                ratio: (width / Math.abs(kp2.x - kp1.x)).toFixed(2),
+                                closest: match.name,
+                                error: (match.error * 100).toFixed(1),
+                                type: 'horizontal'
+                            });
+                        }
+                    }
+                    
+                    if (height > 100) {
+                        const ratio = height / image.height * 100;
+                        const match = findClosestMatch(ratio);
+                        if (match) {
+                            results.push({
+                                a: kp1.name,
+                                b: kp2.name,
+                                metric: 'vertical distance',
+                                value: (height / image.height * 100).toFixed(2) + '%',
+                                ratio: (height / Math.abs(kp2.y - kp1.y)).toFixed(2),
+                                closest: match.name,
+                                error: (match.error * 100).toFixed(1),
+                                type: 'vertical'
+                            });
+                        }
+                    }
+                }
+            }
+            
+            return results.sort((a, b) => parseFloat(a.error) - parseFloat(b.error));
+        }
+        
+        function generateJavaScript() {
+            if (!image) return '```javascript\n// Load an image first...\n```';
+            
+            let code = `// Auto-generated proportional system from traced.html\nvar W = ${image.width}, H = ${image.height};\nvar cx = W/2;\n`;
+            
+            keypoints.forEach(kp => {
+                const x = (kp.x / image.width).toFixed(3);
+                const y = (kp.y / image.height).toFixed(3);
+                code += `// ${kp.name} at (${x}W, ${y}H)\nvar ${kp.name}X = W * ${x};\nvar ${kp.name}Y = H * ${y};\n`;
+            });
+            
+            return code.trim();
+        }
+        
+        // UI Updates
+        function updateUI() {
+            // Keypoints list
+            const kpList = document.getElementById('keypointsList');
+            kpList.innerHTML = '';
+            keypoints.forEach(kp => {
+                const div = document.createElement('div');
+                div.className = 'keypoint-item';
+                div.innerHTML = `
+                    <div style="width:12px;height:12px;border-radius:50%;background:${kp.color}"></div>
+                    <span>${kp.id}. ${kp.name}</span>
+                    ${kp.groupId ? `<span style="color:#888;font-size:11px;margin-left:auto">Grouped</span>` : ''}
+                `;
+                kpList.appendChild(div);
+            });
+            
+            // Groups list
+            const groupsList = document.getElementById('groupsList');
+            groupsList.innerHTML = '';
+            groups.forEach(g => {
+                const div = document.createElement('div');
+                div.className = 'group-item';
+                const members = g.keypointIds.map(id => {
+                    const kp = keypoints.find(k => k.id === id);
+                    return kp ? kp.name : `Point ${id}`;
+                }).join(', ');
+                div.innerHTML = `
+                    <div class="group-header">
+                        <div class="group-color" style="background:${g.color}"></div>
+                        <span>${g.name}</span>
+                    </div>
+                    <div class="group-members">Members: ${members}</div>
+                `;
+                groupsList.appendChild(div);
+            });
+            
+            // Analysis table
+            const table = document.getElementById('analysisTable');
+            const results = analyzeProportions();
+            table.innerHTML = '';
+            results.forEach(r => {
+                const row = document.createElement('tr');
+                let statusClass = 'match-none';
+                let icon = '';
+                if (parseFloat(r.error) < 2) {
+                    statusClass = 'match-strong';
+                    icon = '✓';
+                } else if (parseFloat(r.error) < 5) {
+                    statusClass = 'match-possible';
+                    icon = '≈';
+                }
+                row.className = statusClass;
+                row.innerHTML = `
+                    <td>${r.a}</td>
+                    <td>${r.b}</td>
+                    <td>${r.value}</td>
+                    <td class="match-icon">${icon} ${r.closest} ${parseFloat(r.error) < 5 ? `(${r.error}%)` : ''}</td>
+                `;
+                table.appendChild(row);
+            });
+            if (results.length === 0) {
+                table.innerHTML = '<tr><td colspan="4" style="color:#666;padding:20px;text-align:center">Add at least 2 keypoints to see proportional relationships</td></tr>';
+            }
+            
+            // Code output
+            const codeOutput = document.getElementById('codeOutput');
+            codeOutput.textContent = generateJavaScript();
+        }
+        
+        // Group creation
+        function createGroup() {
+            const nameInput = document.getElementById('newGroupName');
+            const name = nameInput.value.trim();
+            if (!name) return;
+            
+            groups.push({
+                id: nextGroupId++,
+                name: name,
+                color: keypointColors[(nextGroupId - 1) % keypointColors.length],
+                keypointIds: []
+            });
+            nameInput.value = '';
+            updateUI();
+        }
+        
+        // Overlay toggles
+        function toggleOverlay(name) {
+            overlays[name] = !overlays[name];
+            document.getElementById('overlay' + name).classList.toggle('active', overlays[name]);
+            draw();
+        }
+        
+        // File operations
+        function saveKeypoints() {
+            if (!image) {
+                alert('Load an image first');
+                return;
+            }
+            const data = {
+                image: { width: image.width, height: image.height },
+                keypoints: keypoints.map(k => ({
+                    id: k.id,
+                    name: k.name,
+                    x: k.x,
+                    y: k.y,
+                    groupId: k.groupId
+                })),
+                groups: groups.map(g => ({
+                    id: g.id,
+                    name: g.name,
+                    color: g.color,
+                    keypointIds: g.keypointIds
+                }))
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'traced-keypoints.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function loadKeypoints(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    image = new Image();
+                    image.width = data.image.width;
+                    image.height = data.image.height;
+                    keypoints = data.keypoints.map(k => ({
+                        id: k.id,
+                        name: k.name,
+                        x: k.x,
+                        y: k.y,
+                        groupId: k.groupId,
+                        color: keypointColors[(k.id - 1) % keypointColors.length]
+                    }));
+                    groups = data.groups.map(g => ({
+                        id: g.id,
+                        name: g.name,
+                        color: g.color,
+                        keypointIds: g.keypointIds
+                    }));
+                    nextKeypointId = Math.max(...keypoints.map(k => k.id), 0) + 1;
+                    nextGroupId = Math.max(...groups.map(g => g.id), 0) + 1;
+                    resizeCanvas();
+                    updateUI();
+                } catch (err) {
+                    alert('Error loading JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function copyCode() {
+            const code = document.getElementById('codeOutput').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Copied to clipboard!');
+            });
+        }
+        
+        // Initialize
+        window.addEventListener('resize', resizeCanvas);
+        setTimeout(() => {
+            resizeCanvas();
+            updateUI();
+        }, 100);
+    </script>
+</body>
+</html>
