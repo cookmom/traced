@@ -513,10 +513,11 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
                 else:
                     dome_profile = "saucer"
             
+            hr = p.get("h_ratio", 1.0)
             curve_defs.append(generate_dome_js(name, p["cx"], p["cy"], p["radius"], dome_profile))
-            formula = f'hemisphere R={p["radius"]:.1f} | {layer} wt={weight}'
+            formula = f'{dome_profile} R={p["radius"]:.1f} | {layer} wt={weight}'
             
-            bbox = f'[{int(p["cx"]-p["radius"]-10)},{int(p["cy"]-p["radius"]*hr-10)},{int(p["cx"]+p["radius"]+10)},{int(p["cy"]+10)}]'
+            bbox = f'[{int(p["cx"]-p["radius"]-10)},{int(p["cy"]-p["radius"]*max(hr,1)-10)},{int(p["cx"]+p["radius"]+10)},{int(p["cy"]+10)}]'
             dur = 1.2
             
             draw = f"""brush.set('2H','#5a5248',{weight});
