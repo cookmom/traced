@@ -186,6 +186,48 @@ def generate_arch_js(name, cx, spring_y, half_span, profile="pointed", rise_span
       var cusps = 0.08*Math.sin(Math.PI*t*5); // small scallops
       pts_{name}.push([x, {spring_y}-{rise}*(base+cusps), 0.3+0.7*base]);}}"""
     
+    elif profile == "tudor":
+        # Four-center depressed arch — flatter middle, steeper sides
+        return f"""
+    // {name}: tudor arch (span={half_span*2:.0f}, rise/span={rise_span:.3f})
+    var pts_{name} = [];
+    for(var i=0;i<=40;i++){{var t=i/40;
+      var x={cx}-{half_span}+{half_span}*2*t;
+      var y;
+      if(t<0.2||t>0.8){{var nt=t<0.2?t/0.2:(1-t)/0.2;y={spring_y}-{rise}*0.4*Math.sin(Math.PI/2*nt);}}
+      else{{var nt=(t-0.2)/0.6;y={spring_y}-{rise}*(0.4+0.6*Math.sin(Math.PI*nt));}}
+      pts_{name}.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}}"""
+    
+    elif profile == "elliptical":
+        # Semi-ellipse
+        return f"""
+    // {name}: elliptical arch (span={half_span*2:.0f}, rise/span={rise_span:.3f})
+    var pts_{name} = [];
+    for(var i=0;i<=30;i++){{var t=i/30;var a=Math.PI*(1-t);
+      pts_{name}.push([{cx}+{half_span}*Math.cos(a),{spring_y}-{rise}*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}}"""
+    
+    elif profile == "catenary":
+        # Inverted catenary — structurally optimal
+        return f"""
+    // {name}: catenary arch (span={half_span*2:.0f}, rise/span={rise_span:.3f})
+    var pts_{name} = [];
+    var _a_{name}={rise}/(Math.cosh(1.5)-1);
+    for(var i=0;i<=30;i++){{var t=i/30;
+      var x={cx}-{half_span}+{half_span}*2*t;
+      var nx=(t-0.5)*3;
+      var y={spring_y}-_a_{name}*(Math.cosh(1.5)-Math.cosh(nx));
+      pts_{name}.push([x,y,0.3+0.7*Math.sin(Math.PI*t)]);}}"""
+    
+    elif profile == "parabolic":
+        # Parabolic — y = a*x²
+        return f"""
+    // {name}: parabolic arch (span={half_span*2:.0f}, rise/span={rise_span:.3f})
+    var pts_{name} = [];
+    for(var i=0;i<=30;i++){{var t=i/30;
+      var x={cx}-{half_span}+{half_span}*2*t;
+      var nx=(x-{cx})/{half_span};
+      pts_{name}.push([x,{spring_y}-{rise}*(1-nx*nx),0.3+0.7*Math.sin(Math.PI*t)]);}}"""
+    
     else:  # pointed (default)
         return f"""
     // {name}: pointed arch (span={half_span*2:.0f}, rise/span={rise_span:.3f})
@@ -461,14 +503,15 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
         
         # Generate the mathematical curve
         if "dome" in shape:
-            dome_profile = "hemisphere"
-            hr = p.get("h_ratio", 1.0)
-            if hr > 1.4:
-                dome_profile = "onion"
-            elif hr > 0.6:
-                dome_profile = "hemisphere"
-            else:
-                dome_profile = "saucer"
+            dome_profile = p.get("best_dome_profile", None)
+            if not dome_profile:
+                hr = p.get("h_ratio", 1.0)
+                if hr > 1.4:
+                    dome_profile = "onion"
+                elif hr > 0.6:
+                    dome_profile = "hemisphere"
+                else:
+                    dome_profile = "saucer"
             
             curve_defs.append(generate_dome_js(name, p["cx"], p["cy"], p["radius"], dome_profile))
             formula = f'hemisphere R={p["radius"]:.1f} | {layer} wt={weight}'
@@ -494,6 +537,16 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
                 profile = "horseshoe"
             elif "ogee" in shape:
                 profile = "ogee"
+            elif "tudor" in shape:
+                profile = "tudor"
+            elif "elliptical" in shape:
+                profile = "elliptical"
+            elif "catenary" in shape:
+                profile = "catenary"
+            elif "cusped" in shape:
+                profile = "cusped"
+            elif "parabolic" in shape:
+                profile = "parabolic"
             
             rr = p.get("rise_ratio", 0.866)
             curve_defs.append(generate_arch_js(name, p["cx"], p["spring_y"], p["half_span"], profile, rr))
