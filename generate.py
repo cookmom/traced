@@ -696,8 +696,10 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
             b64 = base64.b64encode(f.read()).decode()
         ext = Path(ref_image_path).suffix.lower().replace(".", "")
         mime = "jpeg" if ext in ("jpg", "jpeg") else ext
-        ref_img_css = f"""#ref-overlay{{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start;pointer-events:none;z-index:-1}}
-#ref-overlay img{{max-height:100vh;max-width:calc(100vh*9/16);opacity:0.25;object-fit:contain}}"""
+        ref_img_css = f"""#ref-overlay{{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start;pointer-events:none;z-index:1}}
+#ref-overlay img{{max-height:100vh;max-width:calc(100vh*9/16);opacity:0.2;object-fit:contain}}
+canvas{{position:relative;z-index:2}}
+#hud{{z-index:3}}"""
         ref_img_div = f'<div id="ref-overlay"><img src="data:image/{mime};base64,{b64}"></div>'
         print(f"  Reference overlay: {ref_image_path} (25% opacity)")
     
