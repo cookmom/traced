@@ -52,10 +52,10 @@ def find_closest_ratio(value: float) -> dict:
 
 
 def classify_shape(mask: np.ndarray) -> dict:
-    """Classify a mask's shape as dome, arch, rectangle, etc."""
+    """Classify a mask's shape into 17 architectural types."""
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        return {"type": "unknown", "circularity": 0}
+        return {"type": "unknown", "circularity": 0, "solidity": 0, "convexity": 0, "aspect": 0, "confidence": 0, "vertices": 0}
     
     largest = max(contours, key=cv2.contourArea)
     area = cv2.contourArea(largest)
@@ -66,52 +66,130 @@ def classify_shape(mask: np.ndarray) -> dict:
     aspect = w / h if h > 0 else 1
     solidity = area / (w * h) if w * h > 0 else 0
     
-    # Convex hull
     hull = cv2.convexHull(largest)
     hull_area = cv2.contourArea(hull)
     convexity = area / hull_area if hull_area > 0 else 0
     
-    # Classify
+    # Vertex count for polygon detection
+    epsilon = 0.02 * perimeter
+    approx = cv2.approxPolyDP(largest, epsilon, True)
+    n_vertices = len(approx)
+    
+    # Analyze upper vs lower half curvature (for arch type detection)
+    mid_y = y + h // 2
+    upper_pts = [p for p in largest if p[0][1] < mid_y]
+    lower_pts = [p for p in largest if p[0][1] >= mid_y]
+    upper_circularity = 0
+    if len(upper_pts) > 5:
+        up_cont = np.array(upper_pts)
+        up_area = cv2.contourArea(up_cont) if len(up_cont) >= 3 else 0
+        up_peri = cv2.arcLength(up_cont, False) if len(up_cont) >= 3 else 0
+        upper_circularity = 4 * math.pi * up_area / (up_peri * up_peri) if up_peri > 0 else 0
+    
     shape_type = "unknown"
     confidence = 0.5
     
-    if circularity > 0.75 and convexity > 0.9:
-        shape_type = "dome"  # Near-circular, convex
+    # === CIRCLE (near-perfect) ===
+    if circularity > 0.85 and convexity > 0.95 and 0.85 < aspect < 1.15:
+        shape_type = "circle"
         confidence = circularity
-    elif circularity > 0.5 and aspect > 1.5 and solidity > 0.6:
-        shape_type = "arch"  # Semi-circular top, wider than tall
+    
+    # === DOME (circular, convex, wider-than-tall or equal) ===
+    elif circularity > 0.7 and convexity > 0.88 and aspect >= 0.7:
+        shape_type = "dome"
+        confidence = circularity
+    
+    # === OCTAGON (7-9 vertices, high solidity) ===
+    elif 7 <= n_vertices <= 9 and solidity > 0.75 and convexity > 0.85:
+        shape_type = "octagon"
+        confidence = 0.8
+    
+    # === CRESCENT (thin, curved, low solidity) ===
+    elif solidity < 0.35 and convexity < 0.6 and circularity > 0.2:
+        shape_type = "crescent"
+        confidence = 0.6
+    
+    # === STAR POLYGON (many vertices, moderate solidity) ===
+    elif n_vertices >= 10 and 0.4 < solidity < 0.75 and convexity < 0.8:
+        shape_type = "star_polygon"
+        confidence = 0.65
+    
+    # === OPENWORK / GRILLE (low solidity, complex outline) ===
+    elif solidity < 0.45:
+        shape_type = "openwork"
+        confidence = 0.55
+    
+    # === MINARET (extremely tall and thin, at edge of image) ===
+    elif aspect < 0.15 and h > 3 * w and convexity > 0.7:
+        shape_type = "minaret"
+        confidence = 0.75
+    
+    # === COLUMN (tall and thin) ===
+    elif aspect < 0.3 and h > 2.5 * w and convexity > 0.7:
+        shape_type = "column"
+        confidence = 0.75
+    
+    # === HORIZONTAL BAND (very wide, short) ===
+    elif aspect > 3.0 and solidity > 0.7:
+        shape_type = "horizontal_band"
+        confidence = 0.8
+    
+    # === SPANDREL (triangular, 3 vertices) ===
+    elif n_vertices == 3 and solidity > 0.6:
+        shape_type = "spandrel"
         confidence = 0.7
-    elif circularity > 0.5 and aspect < 0.7 and solidity > 0.6:
-        shape_type = "tall_arch"  # Taller than wide arch
-        confidence = 0.7
-    elif convexity > 0.85 and 0.3 < circularity < 0.75:
-        if aspect > 2:
-            shape_type = "horizontal_band"
-            confidence = 0.8
-        elif aspect < 0.4:
-            shape_type = "column"
-            confidence = 0.8
+    
+    # === ARCH TYPES (curved top, open bottom or sides) ===
+    elif circularity > 0.4 and upper_circularity > 0.3:
+        if aspect < 0.7:
+            # Taller than wide
+            if upper_circularity > 0.5 and solidity > 0.7:
+                shape_type = "pointed_arch"
+                confidence = 0.7
+            else:
+                shape_type = "tall_arch"
+                confidence = 0.65
+        elif aspect > 1.2:
+            # Wider than tall — could be horseshoe
+            if convexity > 0.85 and circularity > 0.55:
+                shape_type = "horseshoe_arch"
+                confidence = 0.65
+            else:
+                shape_type = "arch"
+                confidence = 0.6
         else:
-            shape_type = "panel"
-            confidence = 0.6
-    elif solidity > 0.8 and circularity < 0.5:
+            # Near-square arch opening — could be ogee
+            if convexity < 0.85 and upper_circularity > 0.3:
+                shape_type = "ogee_arch"
+                confidence = 0.55
+            else:
+                shape_type = "arch"
+                confidence = 0.6
+    
+    # === SQUARE (rectangle with near-equal sides) ===
+    elif solidity > 0.8 and 0.85 < aspect < 1.15 and circularity < 0.7:
+        shape_type = "square"
+        confidence = 0.75
+    
+    # === RECTANGLE (high solidity, clear corners) ===
+    elif solidity > 0.75 and circularity < 0.7 and n_vertices <= 6:
+        shape_type = "rectangle"
+        confidence = 0.7
+    
+    # === WALL (large area, blocky) ===
+    elif solidity > 0.7 and circularity < 0.5:
         shape_type = "wall"
         confidence = 0.6
-    elif solidity < 0.5:
-        shape_type = "openwork"  # Grille, lattice
-        confidence = 0.5
     
-    # Check for dome-like top profile (upper half more curved than lower)
-    if shape_type == "unknown" and len(largest) > 10:
-        mid_y = y + h // 2
-        upper_pts = [p for p in largest if p[0][1] < mid_y]
-        if len(upper_pts) > 5:
-            upper_contour = np.array(upper_pts)
-            upper_hull = cv2.convexHull(upper_contour)
-            upper_convexity = len(upper_pts) / len(upper_hull) if len(upper_hull) > 0 else 0
-            if upper_convexity > 0.7:
-                shape_type = "dome_like"
-                confidence = 0.6
+    # === DOME-LIKE (curved upper profile) ===
+    elif upper_circularity > 0.4 and convexity > 0.7:
+        shape_type = "dome_like"
+        confidence = 0.55
+    
+    # === PANEL (catch-all for remaining convex shapes) ===
+    elif convexity > 0.7:
+        shape_type = "panel"
+        confidence = 0.5
     
     return {
         "type": shape_type,
@@ -120,6 +198,7 @@ def classify_shape(mask: np.ndarray) -> dict:
         "convexity": round(convexity, 4),
         "aspect": round(aspect, 4),
         "confidence": round(confidence, 3),
+        "vertices": n_vertices,
     }
 
 
@@ -457,12 +536,155 @@ def generate_js(extraction: dict) -> str:
     return "\n".join(lines)
 
 
+def generate_analysis_card(extraction: dict, building_name: str = "Unknown Building") -> str:
+    """Generate architectural analysis card with scores and style markers."""
+    elements = extraction.get("elements", [])
+    relationships = extraction.get("relationships", [])
+    
+    strong = [r for r in relationships if r["quality"] == "strong"]
+    possible = [r for r in relationships if r["quality"] == "possible"]
+    
+    # --- Proportional Coherence Score ---
+    n_pairs = max(1, len(elements) * (len(elements) - 1) // 2)
+    max_possible = n_pairs * 3  # w, h, y ratios per pair
+    coherence = min(100, int((len(strong) * 3 + len(possible) * 1.5) * 100 / max(1, max_possible)))
+    
+    # --- System Detection ---
+    phi_family = {"φ", "1/φ", "φ²", "1/φ²"}
+    sqrt2_family = {"√2", "1/√2"}
+    sqrt3_family = {"√3", "√3/2"}
+    
+    phi_count = sum(1 for r in strong + possible if r.get("match") in phi_family)
+    sqrt2_count = sum(1 for r in strong + possible if r.get("match") in sqrt2_family)
+    sqrt3_count = sum(1 for r in strong + possible if r.get("match") in sqrt3_family)
+    
+    has_phi = phi_count > 0
+    has_sqrt2 = sqrt2_count > 0
+    has_sqrt3 = sqrt3_count > 0
+    
+    if has_phi and has_sqrt2 and has_sqrt3:
+        system = "Islamic Synthesis (φ + √2 + √3)"
+    elif phi_count >= sqrt2_count and phi_count >= sqrt3_count and has_phi:
+        system = "Golden Section dominant"
+    elif sqrt2_count >= phi_count and sqrt2_count >= sqrt3_count and has_sqrt2:
+        system = "Ad Quadratum dominant"
+    elif sqrt3_count >= phi_count and sqrt3_count >= sqrt2_count and has_sqrt3:
+        system = "Ad Triangulum dominant"
+    elif len(strong) + len(possible) > 0:
+        system = "Mixed / Simple ratios"
+    else:
+        system = "No clear system detected"
+    
+    # --- Symmetry Score ---
+    bilateral_pairs = 0
+    checked = set()
+    for i, a in enumerate(elements):
+        ax = a.get("position_pct", {}).get("x", 0)
+        for j, b in enumerate(elements):
+            if j <= i or (i, j) in checked:
+                continue
+            checked.add((i, j))
+            bx = b.get("position_pct", {}).get("x", 0)
+            # Check if mirrored around 0.5 (center)
+            if abs((1 - ax) - bx) < 0.05 and abs(ax - 0.5) > 0.05:
+                # Also check similar y position and size
+                ay = a.get("position_pct", {}).get("y", 0)
+                by = b.get("position_pct", {}).get("y", 0)
+                if abs(ay - by) < 0.05:
+                    bilateral_pairs += 1
+    
+    non_center = sum(1 for e in elements if abs(e.get("position_pct", {}).get("x", 0.5) - 0.5) > 0.05)
+    symmetry = min(100, int(bilateral_pairs * 2 * 100 / max(1, non_center)))
+    
+    # --- Average error of strong matches ---
+    avg_error = sum(r["error_pct"] for r in strong) / max(1, len(strong))
+    
+    # --- Shape type counts ---
+    shape_counts = {}
+    for e in elements:
+        t = e.get("shape", {}).get("type", "unknown")
+        shape_counts[t] = shape_counts.get(t, 0) + 1
+    
+    dome_count = sum(v for k, v in shape_counts.items() if "dome" in k)
+    
+    # --- Build card ---
+    w = 58
+    lines = []
+    lines.append("╔" + "═" * w + "╗")
+    lines.append("║" + f"  TRACED ANALYSIS — {building_name}".ljust(w) + "║")
+    lines.append("╠" + "═" * w + "╣")
+    
+    # Proportional Coherence
+    bar = "█" * (coherence // 5) + "░" * (20 - coherence // 5)
+    lines.append("║" + f"  PROPORTIONAL COHERENCE        {coherence:3d}/100".ljust(w) + "║")
+    lines.append("║" + f"  [{bar}]".ljust(w) + "║")
+    lines.append("║" + f"    φ relationships:          {phi_count:5d}".ljust(w) + "║")
+    lines.append("║" + f"    √2 relationships:         {sqrt2_count:5d}".ljust(w) + "║")
+    lines.append("║" + f"    √3 relationships:         {sqrt3_count:5d}".ljust(w) + "║")
+    lines.append("║" + f"    Strong matches (<2%):     {len(strong):5d}".ljust(w) + "║")
+    lines.append("║" + f"    Average error:            {avg_error:5.2f}%".ljust(w) + "║")
+    lines.append("║" + f"    System: {system}".ljust(w) + "║")
+    lines.append("║" + " " * w + "║")
+    
+    # Symmetry
+    sym_bar = "█" * (symmetry // 5) + "░" * (20 - symmetry // 5)
+    lines.append("║" + f"  SYMMETRY SCORE                {symmetry:3d}/100".ljust(w) + "║")
+    lines.append("║" + f"  [{sym_bar}]".ljust(w) + "║")
+    lines.append("║" + f"    Bilateral pairs found:    {bilateral_pairs:5d}".ljust(w) + "║")
+    lines.append("║" + " " * w + "║")
+    
+    # Elements detected
+    lines.append("║" + f"  ELEMENTS DETECTED             {len(elements):5d}".ljust(w) + "║")
+    for shape_type, count in sorted(shape_counts.items(), key=lambda x: -x[1]):
+        lines.append("║" + f"    {shape_type:25s} {count:5d}".ljust(w) + "║")
+    lines.append("║" + " " * w + "║")
+    
+    # Architectural Style Markers
+    lines.append("║" + "  ARCHITECTURAL STYLE MARKERS".ljust(w) + "║")
+    if has_sqrt2:
+        lines.append("║" + "    ✓ Ad Quadratum (√2) — Mamluk/Roman".ljust(w) + "║")
+    if has_sqrt3:
+        lines.append("║" + "    ✓ Ad Triangulum (√3) — Gothic/pointed arch".ljust(w) + "║")
+    if has_phi:
+        lines.append("║" + "    ✓ Golden Section (φ) — Classical/Ottoman".ljust(w) + "║")
+    if any("horseshoe" in e.get("shape", {}).get("type", "") for e in elements):
+        lines.append("║" + "    ✓ Horseshoe arch — Moorish/Maghrebi".ljust(w) + "║")
+    if any("octagon" in e.get("shape", {}).get("type", "") for e in elements):
+        lines.append("║" + "    ✓ Octagonal geometry — Islamic Ad Quadratum".ljust(w) + "║")
+    if dome_count >= 3:
+        lines.append("║" + "    ✓ Dome cascade — Mughal/Ottoman hierarchy".ljust(w) + "║")
+    if any("star" in e.get("shape", {}).get("type", "") for e in elements):
+        lines.append("║" + "    ✓ Star polygon — Islamic geometric art".ljust(w) + "║")
+    if any("pointed" in e.get("shape", {}).get("type", "") for e in elements):
+        lines.append("║" + "    ✓ Pointed arch — Islamic/Gothic tradition".ljust(w) + "║")
+    lines.append("║" + " " * w + "║")
+    
+    # Notable
+    lines.append("║" + "  NOTABLE".ljust(w) + "║")
+    if has_phi and has_sqrt2 and has_sqrt3:
+        lines.append("║" + "    All three canonical proportional systems".ljust(w) + "║")
+        lines.append("║" + "    found — characteristic of pan-Islamic".ljust(w) + "║")
+        lines.append("║" + "    synthesis architecture.".ljust(w) + "║")
+    if avg_error < 1.0 and len(strong) > 5:
+        lines.append("║" + "    Extremely precise proportional construction".ljust(w) + "║")
+        lines.append("║" + "    — suggests careful geometric planning.".ljust(w) + "║")
+    if symmetry > 90:
+        lines.append("║" + "    Near-perfect bilateral symmetry.".ljust(w) + "║")
+    if dome_count >= 3:
+        lines.append("║" + f"    {dome_count} dome elements at varying scales —".ljust(w) + "║")
+        lines.append("║" + "    hierarchical dome cascade detected.".ljust(w) + "║")
+    
+    lines.append("╚" + "═" * w + "╝")
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Traced: SAM 2 architectural extraction")
     parser.add_argument("--image", required=True)
     parser.add_argument("--output", default="extraction.json")
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--js-output", default=None)
+    parser.add_argument("--name", default="Unknown Building", help="Building name for analysis card")
     args = parser.parse_args()
     
     extraction = run_sam2_extraction(args.image, args.checkpoint)
@@ -470,6 +692,9 @@ def main():
     
     js_code = generate_js(extraction)
     extraction["generated_js"] = js_code
+    
+    card = generate_analysis_card(extraction, args.name)
+    extraction["analysis_card"] = card
     
     Path(args.output).write_text(json.dumps(extraction, indent=2, default=str))
     
@@ -490,6 +715,9 @@ def main():
     print("GENERATED JAVASCRIPT:")
     print(f"{'='*60}")
     print(js_code)
+    
+    print(f"\n")
+    print(card)
 
 
 if __name__ == "__main__":
