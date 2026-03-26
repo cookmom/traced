@@ -489,13 +489,63 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
     
     params = optimized["params"]
     
+    # === DEDUPLICATION: Remove sub-elements that overlap >70% with parent ===
+    def bbox_overlap(a, b):
+        """Compute overlap ratio between two elements."""
+        ax = a.get("cx", a.get("x", 0) + a.get("w", 0)/2)
+        ay = a.get("cy", a.get("y", 0) + a.get("h", 0)/2)
+        ar = a.get("radius", max(a.get("w", 50), a.get("h", 50)) / 2)
+        bx = b.get("cx", b.get("x", 0) + b.get("w", 0)/2)
+        by = b.get("cy", b.get("y", 0) + b.get("h", 0)/2)
+        br = b.get("radius", max(b.get("w", 50), b.get("h", 50)) / 2)
+        dist = math.sqrt((ax - bx)**2 + (ay - by)**2)
+        max_r = max(ar, br)
+        if max_r == 0:
+            return 0
+        return max(0, 1 - dist / max_r)
+    
+    # Sort by size (largest first) — keep larger, skip smaller duplicates
+    sized_names = sorted(params.keys(), key=lambda n: 
+        params[n].get("radius", 0) + params[n].get("w", 0) * params[n].get("h", 0) / 10000, reverse=True)
+    
+    kept = {}
+    skipped = set()
+    for name in sized_names:
+        p = params[name]
+        # Skip full-image elements
+        el = el_lookup.get(name, {})
+        if el.get("area_pct", 0) > 0.35:
+            skipped.add(name)
+            continue
+        # Skip tiny elements
+        if el.get("area_pct", 0) < 0.0008:
+            skipped.add(name)
+            continue
+        # Skip wall/panel background elements (they're not architectural features to draw)
+        if p.get("type") in ("wall", "panel") and el.get("area_pct", 0) > 0.1:
+            skipped.add(name)
+            continue
+        # Check overlap with already-kept elements
+        is_dup = False
+        for kept_name, kept_p in kept.items():
+            overlap = bbox_overlap(p, kept_p)
+            if overlap > 0.7:
+                is_dup = True
+                break
+        if is_dup:
+            skipped.add(name)
+            continue
+        kept[name] = p
+    
+    print(f"  Deduplication: {len(params)} → {len(kept)} elements ({len(skipped)} skipped)")
+    
     # Sort by depth layer (back to front)
     layer_order = {"distant_sky": 0, "background_domes": 1, "mid_facade": 2, "foreground_frame": 3}
     
     # Match params to extraction elements for depth info
     el_lookup = {e["name"]: e for e in extraction.get("elements", [])}
     
-    sorted_names = sorted(params.keys(), key=lambda n: 
+    sorted_names = sorted(kept.keys(), key=lambda n: 
         layer_order.get(el_lookup.get(n, {}).get("depth", {}).get("layer", "mid_facade"), 2))
     
     # Build curve definitions and steps
@@ -503,7 +553,7 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
     steps_js = []
     
     for idx, name in enumerate(sorted_names):
-        p = params[name]
+        p = kept[name]
         shape = p.get("type", "unknown")
         el = el_lookup.get(name, {})
         depth = el.get("depth", {})
