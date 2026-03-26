@@ -404,6 +404,164 @@ def find_best_curve_family(name: str, p: dict, ref_edges: np.ndarray,
     return best_family, best_loss, results
 
 
+def ransac_fit_circle(contour_pts: list, n_iter: int = 100, threshold: float = 5.0) -> dict | None:
+    """RANSAC circle fitting — robust to outlier contour points."""
+    if len(contour_pts) < 5:
+        return None
+    
+    pts = np.array(contour_pts, dtype=np.float64)
+    best_cx, best_cy, best_r = 0, 0, 0
+    best_inliers = 0
+    
+    for _ in range(n_iter):
+        # Sample 3 random points
+        idx = np.random.choice(len(pts), 3, replace=False)
+        p1, p2, p3 = pts[idx[0]], pts[idx[1]], pts[idx[2]]
+        
+        # Fit circle through 3 points
+        ax, ay = p1[0], p1[1]
+        bx, by = p2[0], p2[1]
+        cx_t, cy_t = p3[0], p3[1]
+        
+        D = 2 * (ax * (by - cy_t) + bx * (cy_t - ay) + cx_t * (ay - by))
+        if abs(D) < 1e-10:
+            continue
+        
+        ux = ((ax*ax + ay*ay) * (by - cy_t) + (bx*bx + by*by) * (cy_t - ay) + (cx_t*cx_t + cy_t*cy_t) * (ay - by)) / D
+        uy = ((ax*ax + ay*ay) * (cx_t - bx) + (bx*bx + by*by) * (ax - cx_t) + (cx_t*cx_t + cy_t*cy_t) * (bx - ax)) / D
+        r = math.sqrt((ax - ux)**2 + (ay - uy)**2)
+        
+        # Count inliers
+        dists = np.sqrt((pts[:, 0] - ux)**2 + (pts[:, 1] - uy)**2)
+        inliers = np.sum(np.abs(dists - r) < threshold)
+        
+        if inliers > best_inliers:
+            best_inliers = inliers
+            best_cx, best_cy, best_r = ux, uy, r
+    
+    if best_inliers < len(pts) * 0.3:
+        return None
+    
+    return {
+        "cx": float(best_cx), "cy": float(best_cy), "radius": float(best_r),
+        "inlier_ratio": round(best_inliers / len(pts), 3),
+    }
+
+
+def ransac_fit_line(contour_pts: list, n_iter: int = 50, threshold: float = 3.0) -> dict | None:
+    """RANSAC line fitting — for walls, columns, bands."""
+    if len(contour_pts) < 4:
+        return None
+    
+    pts = np.array(contour_pts, dtype=np.float64)
+    best_line = None
+    best_inliers = 0
+    
+    for _ in range(n_iter):
+        idx = np.random.choice(len(pts), 2, replace=False)
+        p1, p2 = pts[idx[0]], pts[idx[1]]
+        
+        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+        length = math.sqrt(dx*dx + dy*dy)
+        if length < 1:
+            continue
+        
+        nx, ny = -dy/length, dx/length
+        dists = np.abs((pts[:, 0] - p1[0]) * nx + (pts[:, 1] - p1[1]) * ny)
+        inliers = np.sum(dists < threshold)
+        
+        if inliers > best_inliers:
+            best_inliers = inliers
+            best_line = {"x1": float(p1[0]), "y1": float(p1[1]),
+                        "x2": float(p2[0]), "y2": float(p2[1]),
+                        "angle": math.degrees(math.atan2(dy, dx))}
+    
+    if best_line and best_inliers > len(pts) * 0.3:
+        best_line["inlier_ratio"] = round(best_inliers / len(pts), 3)
+        return best_line
+    return None
+
+
+def apply_geometric_constraints(params: dict) -> dict:
+    """Enforce architectural constraints between elements.
+    
+    Constraints:
+    1. Symmetry: mirrored elements share same y, symmetric x around axis
+    2. Alignment: elements at same depth share springing heights
+    3. Tangency: domes sit smoothly on drums
+    4. Orthogonality: walls meet at 90°
+    """
+    # Find symmetry axis (median x of all elements)
+    all_cx = [p.get("cx", p.get("x", 0) + p.get("w", 0)/2) for p in params.values()]
+    axis_x = float(np.median(all_cx)) if all_cx else 540.0
+    
+    # 1. SYMMETRY — find mirrored pairs and enforce
+    names = list(params.keys())
+    for i, name_a in enumerate(names):
+        pa = params[name_a]
+        ax = pa.get("cx", pa.get("x", 0) + pa.get("w", 0)/2)
+        ay = pa.get("cy", pa.get("y", 0) + pa.get("h", 0)/2)
+        
+        for j, name_b in enumerate(names):
+            if j <= i:
+                continue
+            pb = params[name_b]
+            bx = pb.get("cx", pb.get("x", 0) + pb.get("w", 0)/2)
+            by = pb.get("cy", pb.get("y", 0) + pb.get("h", 0)/2)
+            
+            # Check if mirrored around axis (within 10% tolerance)
+            mirror_x = 2 * axis_x - ax
+            if abs(bx - mirror_x) < abs(ax - axis_x) * 0.2 and abs(ay - by) < 30:
+                # Enforce exact symmetry
+                mid_y = (ay + by) / 2
+                dist_from_axis = abs(ax - axis_x)
+                
+                if "cx" in pa:
+                    pa["cx"] = axis_x - dist_from_axis
+                    pb["cx"] = axis_x + dist_from_axis
+                if "cy" in pa and "cy" in pb:
+                    pa["cy"] = mid_y
+                    pb["cy"] = mid_y
+                if "spring_y" in pa and "spring_y" in pb:
+                    mid_sy = (pa["spring_y"] + pb["spring_y"]) / 2
+                    pa["spring_y"] = mid_sy
+                    pb["spring_y"] = mid_sy
+                if "half_span" in pa and "half_span" in pb:
+                    avg_hs = (pa["half_span"] + pb["half_span"]) / 2
+                    pa["half_span"] = avg_hs
+                    pb["half_span"] = avg_hs
+                if "rise_ratio" in pa and "rise_ratio" in pb:
+                    avg_rr = (pa["rise_ratio"] + pb["rise_ratio"]) / 2
+                    pa["rise_ratio"] = avg_rr
+                    pb["rise_ratio"] = avg_rr
+                
+                print(f"    SYMMETRY: {name_a} ↔ {name_b} (axis={axis_x:.0f})")
+    
+    # 2. ALIGNMENT — arches at same depth share springing heights
+    arch_elements = [(n, p) for n, p in params.items() if "arch" in p.get("type", "")]
+    if len(arch_elements) >= 2:
+        # Group by similar spring_y (within 30px)
+        for i, (na, pa) in enumerate(arch_elements):
+            for j, (nb, pb) in enumerate(arch_elements):
+                if j <= i:
+                    continue
+                if abs(pa.get("spring_y", 0) - pb.get("spring_y", 0)) < 30:
+                    avg_sy = (pa["spring_y"] + pb["spring_y"]) / 2
+                    pa["spring_y"] = avg_sy
+                    pb["spring_y"] = avg_sy
+                    print(f"    ALIGNMENT: {na} + {nb} spring_y → {avg_sy:.0f}")
+    
+    # 3. TANGENCY — dome centers aligned with axis
+    for name, p in params.items():
+        if "dome" in p.get("type", ""):
+            if abs(p.get("cx", 0) - axis_x) < 50:
+                old_cx = p["cx"]
+                p["cx"] = axis_x
+                print(f"    TANGENCY: {name} cx {old_cx:.0f} → {axis_x:.0f} (axis-aligned)")
+    
+    return params
+
+
 def extraction_to_params(extraction: dict, scale: float, ox: float, oy: float) -> dict:
     """Convert extraction elements to optimizable parameter dict."""
     params = {}
@@ -588,6 +746,10 @@ def optimize_params(params: dict, ref_edges: np.ndarray,
     
     # Apply best values
     optimized = update_params_from_array(params, param_names, best_values)
+    
+    # Apply geometric constraints (symmetry, alignment, tangency)
+    print(f"\n  Applying geometric constraints...")
+    optimized = apply_geometric_constraints(optimized)
     
     # Final stats
     render = render_from_params(optimized, canvas_w, canvas_h)

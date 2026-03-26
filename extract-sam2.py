@@ -812,11 +812,90 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None, knowledge: dict
               f"pos=({element['position_pct']['x']:.3f},{element['position_pct']['y']:.3f}) "
               f"size={element['area_pct']:.3f}")
     
+    # === SUB-ELEMENT EXTRACTION ===
+    # For large elements (>5% of image), run SAM again inside the region
+    # to find windows, grilles, columns, ornament within
+    print("Running sub-element extraction...")
+    sub_elements = []
+    large_elements = [e for e in elements if e.get("area_pct", 0) > 0.05]
+    
+    for parent in large_elements:
+        bb = parent.get("primitives", {}).get("bbox", {})
+        if not bb or bb.get("w", 0) < 50 or bb.get("h", 0) < 50:
+            continue
+        
+        # Crop image to parent's bounding box
+        x1, y1 = max(0, bb["x"]), max(0, bb["y"])
+        x2, y2 = min(img_w, bb["x"] + bb["w"]), min(img_h, bb["y"] + bb["h"])
+        crop = img_rgb[y1:y2, x1:x2]
+        
+        if crop.shape[0] < 30 or crop.shape[1] < 30:
+            continue
+        
+        try:
+            # Use tighter settings for sub-elements
+            sub_generator = SAM2AutomaticMaskGenerator(
+                model=sam2,
+                points_per_side=32,
+                pred_iou_thresh=0.65,
+                stability_score_thresh=0.82,
+                min_mask_region_area=100,
+            )
+            sub_masks = sub_generator.generate(crop)
+            
+            # Filter: keep only sub-elements that are significantly smaller than parent
+            parent_area = (x2 - x1) * (y2 - y1)
+            for sm in sub_masks:
+                sub_area_pct = sm["area"] / parent_area
+                if sub_area_pct > 0.5 or sub_area_pct < 0.01:
+                    continue  # Skip too-big (parent itself) or too-small (noise)
+                
+                sub_mask = sm["segmentation"].astype(np.uint8)
+                sub_shape = classify_shape(sub_mask, knowledge)
+                sub_prims = fit_primitives(sub_mask, sub_shape)
+                
+                if not sub_prims:
+                    continue
+                
+                # Offset coordinates back to full image space
+                sub_bb = sub_prims["bbox"]
+                sub_prims["bbox"]["x"] += x1
+                sub_prims["bbox"]["y"] += y1
+                sub_prims["center"]["x"] += x1
+                sub_prims["center"]["y"] += y1
+                
+                sub_el = {
+                    "name": f"sub_{parent['name']}_{sub_shape['type']}_{len(sub_elements)}",
+                    "parent": parent["name"],
+                    "shape": sub_shape,
+                    "primitives": sub_prims,
+                    "area_pct": round(sm["area"] / (img_w * img_h), 4),
+                    "position_pct": {
+                        "x": round(sub_prims["center"]["x"] / img_w, 4),
+                        "y": round(sub_prims["center"]["y"] / img_h, 4),
+                    },
+                    "size_pct": {
+                        "w": round(sub_bb["w"] / img_w, 4),
+                        "h": round(sub_bb["h"] / img_h, 4),
+                    },
+                }
+                sub_elements.append(sub_el)
+            
+        except Exception as e:
+            print(f"    Sub-extraction failed for {parent['name']}: {e}")
+    
+    if sub_elements:
+        print(f"  Found {len(sub_elements)} sub-elements within {len(large_elements)} large elements")
+        elements.extend(sub_elements)
+    else:
+        print(f"  No sub-elements found")
+    
     result = {
         "image": str(image_path),
         "image_size": {"w": img_w, "h": img_h},
         "method": "sam2",
         "total_masks": len(masks),
+        "sub_elements_found": len(sub_elements),
         "elements": elements,
     }
     
