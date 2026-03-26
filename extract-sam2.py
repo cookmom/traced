@@ -192,6 +192,82 @@ def classify_shape(mask: np.ndarray, knowledge: dict = None) -> dict:
         shape_type = "panel"
         confidence = 0.5
     
+    # === ADDITIONAL SHAPE DETECTION (doors, windows, modern + Islamic elements) ===
+    
+    # WINDOW — rectangular void within a wall, moderate size, high solidity
+    if shape_type in ("rectangle", "panel", "unknown") and 0.5 < aspect < 2.0:
+        # Windows tend to have clear edges and moderate area relative to parent
+        if solidity > 0.7 and area < (w * h * 0.3):  # Not too big
+            # Check if mostly in upper half of image (windows above ground)
+            cy_pct = (y + h/2) / max(1, mask.shape[0])
+            if cy_pct < 0.75:  # Above lower quarter
+                shape_type = "window"
+                confidence = 0.6
+    
+    # DOOR — tall rectangle in lower portion of image
+    if shape_type in ("rectangle", "panel", "unknown") and aspect < 0.55:
+        cy_pct = (y + h/2) / max(1, mask.shape[0])
+        if cy_pct > 0.5 and solidity > 0.75:  # Lower half, solid
+            shape_type = "door"
+            confidence = 0.6
+    
+    # ROSETTE / ROSE WINDOW — circular decorative element, smaller than dome
+    if shape_type in ("circle", "dome") and area < (mask.shape[0] * mask.shape[1] * 0.02):
+        shape_type = "rosette"
+        confidence = 0.65
+    
+    # BALUSTRADE / RAILING — very wide, very short, near top of walls
+    if shape_type == "horizontal_band" and (h / max(1, w)) < 0.08:
+        shape_type = "balustrade"
+        confidence = 0.6
+    
+    # BUTTRESS — thick vertical element at edge, wider than column
+    if shape_type in ("column", "rectangle") and aspect < 0.4 and 0.3 < (x / max(1, mask.shape[1])):
+        if w > 20 and solidity > 0.8:
+            cx_pct = (x + w/2) / max(1, mask.shape[1])
+            if cx_pct < 0.15 or cx_pct > 0.85:  # Near edges
+                shape_type = "buttress"
+                confidence = 0.6
+    
+    # MIHRAB — pointed arch niche, typically centered, smaller than main arches
+    if shape_type in ("pointed_arch", "arch") and area < (mask.shape[0] * mask.shape[1] * 0.02):
+        cx_pct = (x + w/2) / max(1, mask.shape[1])
+        if 0.4 < cx_pct < 0.6:  # Centered
+            shape_type = "mihrab"
+            confidence = 0.6
+    
+    # MUQARNAS — stalactite vaulting, complex shape with many vertices
+    if n_vertices > 15 and solidity < 0.6 and convexity < 0.7:
+        shape_type = "muqarnas"
+        confidence = 0.55
+    
+    # MASHRABIYA — lattice screen, very low solidity, rectangular
+    if solidity < 0.35 and 0.4 < aspect < 2.5 and n_vertices > 8:
+        shape_type = "mashrabiya"
+        confidence = 0.55
+    
+    # PARAPET — low wall along roofline, wide and short at top
+    if shape_type == "horizontal_band":
+        cy_pct = (y + h/2) / max(1, mask.shape[0])
+        if cy_pct < 0.3:  # Upper portion
+            shape_type = "parapet"
+            confidence = 0.6
+    
+    # VAULT / BARREL VAULT — wide curved ceiling element
+    if shape_type in ("arch", "dome_like") and aspect > 2.0 and circularity > 0.3:
+        shape_type = "vault"
+        confidence = 0.55
+    
+    # CURTAIN WALL — modern: large flat glass panel, high solidity, very large
+    if shape_type in ("wall", "rectangle") and solidity > 0.9 and area > (mask.shape[0] * mask.shape[1] * 0.1):
+        shape_type = "curtain_wall"
+        confidence = 0.55
+    
+    # CANOPY / OVERHANG — wide horizontal element projecting outward
+    if shape_type in ("horizontal_band", "rectangle") and aspect > 4.0:
+        shape_type = "canopy"
+        confidence = 0.5
+    
     # Knowledge-biased reclassification
     if knowledge and shape_type in ("arch", "tall_arch", "unknown"):
         known_arches = knowledge.get("arch_types", [])
