@@ -376,6 +376,18 @@ Created the **Modulor** — a proportional system based on human body dimensions
 - [ ] Style transfer (apply one building's proportions to another's elements)
 - [ ] Auto-keypoint detection (CV finds dome peaks, arch springings automatically)
 - [ ] Multi-view reconstruction (extract from multiple photos of same building)
+- [ ] **LiDAR integration** — iPhone/iPad Pro LiDAR scans for real-world measurements:
+  - Point cloud data gives ACTUAL dimensions (meters, not just ratios)
+  - Depth maps improve SAM segmentation accuracy (foreground/background separation)
+  - Creative exploitation: point cloud → procedural drawing with verified 3D depth
+  - Export point clouds as artistic elements (stipple drawings from depth data)
+- [ ] **Film tech scout / recce tool** — SAM 2/3 + LiDAR for location scouting:
+  - Infer actual room/building dimensions from single photo + LiDAR
+  - Auto-measure ceiling heights, wall widths, door clearances
+  - Flag rigging points, power access, camera positions
+  - Generate VP LED volume pre-vis from location scans
+  - Export dimensions sheet for art department / construction
+  - Compare multiple locations side-by-side with proportional analysis
 
 ---
 
