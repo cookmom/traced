@@ -203,7 +203,7 @@ def classify_shape(mask: np.ndarray) -> dict:
 
 
 def fit_primitives(mask: np.ndarray, shape_info: dict) -> dict:
-    """Fit geometric primitives based on shape classification."""
+    """Fit geometric primitives + curve profiles based on shape classification."""
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return {}
@@ -216,8 +216,10 @@ def fit_primitives(mask: np.ndarray, shape_info: dict) -> dict:
         "center": {"x": float(x + w/2), "y": float(y + h/2)},
     }
     
-    # Fit ellipse for dome-like shapes
-    if shape_info["type"] in ("dome", "dome_like", "arch", "tall_arch") and len(largest) >= 5:
+    # Fit ellipse for curved shapes
+    curved_types = ("dome", "dome_like", "arch", "tall_arch", "pointed_arch",
+                    "horseshoe_arch", "ogee_arch", "circle")
+    if shape_info["type"] in curved_types and len(largest) >= 5:
         el = cv2.fitEllipse(largest)
         result["ellipse"] = {
             "center": {"x": float(el[0][0]), "y": float(el[0][1])},
@@ -226,19 +228,287 @@ def fit_primitives(mask: np.ndarray, shape_info: dict) -> dict:
         }
     
     # Fit minimum enclosing circle for domes
-    if shape_info["type"] in ("dome", "dome_like") and len(largest) >= 3:
-        (cx, cy), radius = cv2.minEnclosingCircle(largest)
+    if shape_info["type"] in ("dome", "dome_like", "circle") and len(largest) >= 3:
+        (cx_c, cy_c), radius = cv2.minEnclosingCircle(largest)
         result["circle"] = {
-            "center": {"x": float(cx), "y": float(cy)},
+            "center": {"x": float(cx_c), "y": float(cy_c)},
             "radius": float(radius),
         }
     
-    # Simplified contour for drawing
-    epsilon = max(2.0, min(w, h) * 0.02)
+    # === CURVE PROFILE EXTRACTION ===
+    shape_t = shape_info["type"]
+    
+    # Extract upper profile (top half of contour — the curved part of domes/arches)
+    if shape_t in curved_types:
+        mid_y = y + h // 2
+        # Sort contour points by x for profile extraction
+        all_pts = [(int(p[0][0]), int(p[0][1])) for p in largest]
+        upper_pts = sorted([p for p in all_pts if p[1] <= mid_y], key=lambda p: p[0])
+        lower_pts = sorted([p for p in all_pts if p[1] > mid_y], key=lambda p: p[0])
+        
+        if len(upper_pts) >= 4:
+            # Normalize upper profile to 0-1 range for portability
+            min_x = min(p[0] for p in upper_pts)
+            max_x = max(p[0] for p in upper_pts)
+            min_y = min(p[1] for p in upper_pts)
+            max_y = max(p[1] for p in upper_pts)
+            span_x = max(1, max_x - min_x)
+            span_y = max(1, max_y - min_y)
+            
+            # Sample profile at regular intervals (20 points)
+            profile_pts = []
+            n_samples = min(20, len(upper_pts))
+            for i in range(n_samples):
+                idx = i * (len(upper_pts) - 1) // max(1, n_samples - 1)
+                px, py = upper_pts[idx]
+                profile_pts.append([
+                    round((px - min_x) / span_x, 4),  # normalized x: 0-1
+                    round((py - min_y) / span_y, 4),   # normalized y: 0-1 (0=top)
+                ])
+            
+            result["upper_profile"] = {
+                "points": profile_pts,
+                "span": {"x": span_x, "y": span_y},
+                "origin": {"x": min_x, "y": min_y},
+            }
+        
+        if len(lower_pts) >= 4:
+            min_x = min(p[0] for p in lower_pts)
+            max_x = max(p[0] for p in lower_pts)
+            min_y = min(p[1] for p in lower_pts)
+            max_y = max(p[1] for p in lower_pts)
+            span_x = max(1, max_x - min_x)
+            span_y = max(1, max_y - min_y)
+            
+            profile_pts = []
+            n_samples = min(20, len(lower_pts))
+            for i in range(n_samples):
+                idx = i * (len(lower_pts) - 1) // max(1, n_samples - 1)
+                px, py = lower_pts[idx]
+                profile_pts.append([
+                    round((px - min_x) / span_x, 4),
+                    round((py - min_y) / span_y, 4),
+                ])
+            
+            result["lower_profile"] = {
+                "points": profile_pts,
+                "span": {"x": span_x, "y": span_y},
+                "origin": {"x": min_x, "y": min_y},
+            }
+    
+    # === ARCH-SPECIFIC: springing points + apex ===
+    if shape_t in ("arch", "tall_arch", "pointed_arch", "horseshoe_arch", "ogee_arch"):
+        all_pts = [(int(p[0][0]), int(p[0][1])) for p in largest]
+        if all_pts:
+            # Apex = topmost point
+            apex = min(all_pts, key=lambda p: p[1])
+            # Springing points = leftmost and rightmost points near the widest horizontal
+            left_spring = min(all_pts, key=lambda p: p[0])
+            right_spring = max(all_pts, key=lambda p: p[0])
+            
+            result["arch_geometry"] = {
+                "apex": {"x": apex[0], "y": apex[1]},
+                "spring_left": {"x": left_spring[0], "y": left_spring[1]},
+                "spring_right": {"x": right_spring[0], "y": right_spring[1]},
+                "span": right_spring[0] - left_spring[0],
+                "rise": max(left_spring[1], right_spring[1]) - apex[1],
+                "rise_to_span": round(
+                    (max(left_spring[1], right_spring[1]) - apex[1]) / 
+                    max(1, right_spring[0] - left_spring[0]), 4
+                ),
+            }
+            # Rise-to-span ratio tells us the arch type:
+            # 0.5 = semicircular, 0.866 = equilateral pointed, >1 = tall pointed
+            # <0.5 = segmental, >0.5 with horseshoe = horseshoe
+            r2s = result["arch_geometry"]["rise_to_span"]
+            result["arch_geometry"]["profile_type"] = (
+                "segmental" if r2s < 0.45 else
+                "semicircular" if r2s < 0.55 else
+                "slightly_pointed" if r2s < 0.75 else
+                "equilateral_pointed" if r2s < 0.95 else
+                "lancet" if r2s < 1.5 else
+                "stilted"
+            )
+    
+    # === DOME-SPECIFIC: base diameter + height ratio ===
+    if shape_t in ("dome", "dome_like"):
+        all_pts = [(int(p[0][0]), int(p[0][1])) for p in largest]
+        if all_pts:
+            apex = min(all_pts, key=lambda p: p[1])
+            # Base = widest horizontal extent at bottom quarter
+            bottom_quarter_y = y + h * 3 // 4
+            base_pts = [p for p in all_pts if p[1] >= bottom_quarter_y]
+            if base_pts:
+                base_left = min(base_pts, key=lambda p: p[0])
+                base_right = max(base_pts, key=lambda p: p[0])
+                base_diameter = base_right[0] - base_left[0]
+                dome_height = max(base_left[1], base_right[1]) - apex[1]
+                
+                result["dome_geometry"] = {
+                    "apex": {"x": apex[0], "y": apex[1]},
+                    "base_left": {"x": base_left[0], "y": base_left[1]},
+                    "base_right": {"x": base_right[0], "y": base_right[1]},
+                    "base_diameter": base_diameter,
+                    "height": dome_height,
+                    "height_to_diameter": round(dome_height / max(1, base_diameter), 4),
+                    "profile_type": (
+                        "onion" if dome_height / max(1, base_diameter) > 0.8 else
+                        "hemisphere" if dome_height / max(1, base_diameter) > 0.4 else
+                        "saucer"
+                    ),
+                }
+    
+    # Simplified contour for drawing (more points for curved shapes)
+    max_pts = 120 if shape_t in curved_types else 60
+    epsilon = max(1.0, min(w, h) * 0.015)
     simplified = cv2.approxPolyDP(largest, epsilon, True)
-    result["contour"] = [[int(pt[0][0]), int(pt[0][1])] for pt in simplified[:80]]
+    result["contour"] = [[int(pt[0][0]), int(pt[0][1])] for pt in simplified[:max_pts]]
     
     return result
+
+
+def extract_dominant_lines(image_path: str) -> list:
+    """Extract dominant structural lines using Hough transform."""
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return []
+    
+    edges = cv2.Canny(img, 50, 150)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=80,
+                            minLineLength=min(img.shape) * 0.1,
+                            maxLineGap=10)
+    if lines is None:
+        return []
+    
+    h, w = img.shape
+    result = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        length = math.sqrt((x2-x1)**2 + (y2-y1)**2)
+        angle = math.degrees(math.atan2(y2-y1, x2-x1)) % 180
+        
+        # Classify line orientation
+        if angle < 10 or angle > 170:
+            orientation = "horizontal"
+        elif 80 < angle < 100:
+            orientation = "vertical"
+        else:
+            orientation = "diagonal"
+        
+        result.append({
+            "start": {"x": round(x1/w, 4), "y": round(y1/h, 4)},
+            "end": {"x": round(x2/w, 4), "y": round(y2/h, 4)},
+            "length_pct": round(length / math.sqrt(w**2 + h**2), 4),
+            "angle": round(angle, 1),
+            "orientation": orientation,
+        })
+    
+    # Sort by length, keep top 30
+    result.sort(key=lambda l: -l["length_pct"])
+    return result[:30]
+
+
+def extract_symmetry(extraction: dict) -> dict:
+    """Analyze bilateral symmetry of the composition."""
+    elements = extraction.get("elements", [])
+    img_w = extraction["image_size"]["w"]
+    
+    # Find symmetry axis (default: image center)
+    x_positions = [e.get("position_pct", {}).get("x", 0.5) for e in elements]
+    # Test if center of mass is near 0.5
+    avg_x = sum(x_positions) / max(1, len(x_positions))
+    axis = 0.5  # Could refine by optimizing mirror matches
+    
+    # Find bilateral pairs
+    pairs = []
+    used = set()
+    for i, a in enumerate(elements):
+        if i in used:
+            continue
+        ax = a.get("position_pct", {}).get("x", 0.5)
+        ay = a.get("position_pct", {}).get("y", 0.5)
+        a_type = a.get("shape", {}).get("type", "")
+        
+        if abs(ax - axis) < 0.03:  # On axis — no pair needed
+            continue
+        
+        best_match = None
+        best_dist = float("inf")
+        for j, b in enumerate(elements):
+            if j <= i or j in used:
+                continue
+            bx = b.get("position_pct", {}).get("x", 0.5)
+            by = b.get("position_pct", {}).get("y", 0.5)
+            b_type = b.get("shape", {}).get("type", "")
+            
+            mirror_x = 2 * axis - ax
+            dist = abs(bx - mirror_x) + abs(by - ay) * 0.5
+            
+            if dist < 0.08 and b_type == a_type and dist < best_dist:
+                best_match = j
+                best_dist = dist
+        
+        if best_match is not None:
+            pairs.append({
+                "left": a["name"],
+                "right": elements[best_match]["name"],
+                "deviation": round(best_dist, 4),
+            })
+            used.add(i)
+            used.add(best_match)
+    
+    return {
+        "axis_x": round(axis, 4),
+        "center_of_mass_x": round(avg_x, 4),
+        "bilateral_pairs": pairs,
+        "symmetry_score": min(100, int(len(pairs) * 2 * 100 / max(1, len(elements)))),
+    }
+
+
+def extract_hierarchy(extraction: dict) -> list:
+    """Determine element nesting/containment hierarchy."""
+    elements = extraction.get("elements", [])
+    hierarchy = []
+    
+    for i, a in enumerate(elements):
+        a_bb = a.get("primitives", {}).get("bbox", {})
+        if not a_bb:
+            continue
+        
+        children = []
+        for j, b in enumerate(elements):
+            if j == i:
+                continue
+            b_bb = b.get("primitives", {}).get("bbox", {})
+            if not b_bb:
+                continue
+            
+            # Check if b is contained within a
+            if (b_bb["x"] >= a_bb["x"] and 
+                b_bb["y"] >= a_bb["y"] and
+                b_bb["x"] + b_bb["w"] <= a_bb["x"] + a_bb["w"] and
+                b_bb["y"] + b_bb["h"] <= a_bb["y"] + a_bb["h"]):
+                children.append(b["name"])
+        
+        if children:
+            hierarchy.append({
+                "parent": a["name"],
+                "children": children,
+                "depth": 0,  # Will be computed below
+            })
+    
+    # Compute depth (elements contained in more parents are deeper)
+    depth_map = {}
+    for el in elements:
+        name = el["name"]
+        depth = sum(1 for h in hierarchy if name in h["children"])
+        depth_map[name] = depth
+    
+    for h in hierarchy:
+        h["depth"] = depth_map.get(h["parent"], 0)
+    
+    hierarchy.sort(key=lambda h: h["depth"])
+    return hierarchy
 
 
 def run_sam2_extraction(image_path: str, checkpoint: str = None) -> dict:
@@ -362,13 +632,29 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None) -> dict:
               f"pos=({element['position_pct']['x']:.3f},{element['position_pct']['y']:.3f}) "
               f"size={element['area_pct']:.3f}")
     
-    return {
+    result = {
         "image": str(image_path),
         "image_size": {"w": img_w, "h": img_h},
         "method": "sam2",
         "total_masks": len(masks),
         "elements": elements,
     }
+    
+    # Additional structural analysis
+    print("Extracting dominant lines...")
+    result["dominant_lines"] = extract_dominant_lines(image_path)
+    print(f"  Found {len(result['dominant_lines'])} structural lines")
+    
+    print("Analyzing symmetry...")
+    result["symmetry"] = extract_symmetry(result)
+    print(f"  Symmetry score: {result['symmetry']['symmetry_score']}/100, "
+          f"{len(result['symmetry']['bilateral_pairs'])} bilateral pairs")
+    
+    print("Building hierarchy...")
+    result["hierarchy"] = extract_hierarchy(result)
+    print(f"  {len(result['hierarchy'])} parent-child relationships")
+    
+    return result
 
 
 def run_opencv_extraction(image_path: str) -> dict:
