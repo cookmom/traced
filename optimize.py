@@ -187,6 +187,223 @@ def edge_iou(edges_a: np.ndarray, edges_b: np.ndarray, dilate: int = 3) -> float
     return intersection / max(1, union)
 
 
+def render_element(canvas: np.ndarray, p: dict):
+    """Render a single element onto canvas."""
+    shape = p.get("type", "unknown")
+    weight = max(1, int(p.get("line_weight", 1.5)))
+    
+    if "dome" in shape:
+        render_dome(canvas, p["cx"], p["cy"], p["radius"], p.get("h_ratio", 1.0), weight)
+    elif "arch" in shape:
+        profile = "pointed"
+        if "horseshoe" in shape:
+            profile = "horseshoe"
+        elif "ogee" in shape:
+            profile = "ogee"
+        elif "semicircular" in shape:
+            profile = "semicircular"
+        elif "cusped" in shape:
+            profile = "cusped"
+        render_arch(canvas, p["cx"], p["spring_y"], p["half_span"],
+                   p.get("rise_ratio", 0.866), profile, weight)
+    elif shape in ("wall", "rectangle", "square"):
+        render_rect(canvas, p["x"], p["y"], p["w"], p["h"], weight)
+
+
+def render_cusped_arch(canvas, cx, spring_y, half_span, rise_ratio, thickness=2):
+    """Cusped arch — pointed with decorative scallops."""
+    h, w = canvas.shape
+    rise = half_span * 2 * rise_ratio
+    pts = []
+    for i in range(100):
+        t = i / 99
+        x_base = cx - half_span + half_span * 2 * t
+        base_curve = math.sin(math.pi * t)
+        cusps = 0.06 * math.sin(math.pi * t * 7)
+        y = spring_y - rise * (base_curve + cusps)
+        ix, iy = int(x_base), int(y)
+        if 0 <= ix < w and 0 <= iy < h:
+            pts.append((ix, iy))
+    for i in range(1, len(pts)):
+        cv2.line(canvas, pts[i-1], pts[i], 255, thickness)
+
+
+def render_tudor_arch(canvas, cx, spring_y, half_span, rise_ratio, thickness=2):
+    """Tudor arch — four-center depressed arch."""
+    h, w = canvas.shape
+    rise = half_span * 2 * rise_ratio
+    pts = []
+    for i in range(100):
+        t = i / 99
+        x = cx - half_span + half_span * 2 * t
+        # Four-center: flatter in middle, steeper at sides
+        if t < 0.2 or t > 0.8:
+            # Steep side arcs
+            nt = t / 0.2 if t < 0.2 else (1 - t) / 0.2
+            y = spring_y - rise * 0.4 * math.sin(math.pi / 2 * nt)
+        else:
+            # Flat center arc
+            nt = (t - 0.2) / 0.6
+            y = spring_y - rise * (0.4 + 0.6 * math.sin(math.pi * nt))
+        ix, iy = int(x), int(y)
+        if 0 <= ix < w and 0 <= iy < h:
+            pts.append((ix, iy))
+    for i in range(1, len(pts)):
+        cv2.line(canvas, pts[i-1], pts[i], 255, thickness)
+
+
+def render_elliptical_arch(canvas, cx, spring_y, half_span, rise_ratio, thickness=2):
+    """Elliptical arch — smooth semi-ellipse."""
+    h, w = canvas.shape
+    rise = half_span * 2 * rise_ratio
+    pts = []
+    for i in range(100):
+        t = i / 99
+        angle = math.pi * (1 - t)
+        x = cx + half_span * math.cos(angle)
+        y = spring_y - rise * math.sin(angle)
+        ix, iy = int(x), int(y)
+        if 0 <= ix < w and 0 <= iy < h:
+            pts.append((ix, iy))
+    for i in range(1, len(pts)):
+        cv2.line(canvas, pts[i-1], pts[i], 255, thickness)
+
+
+def render_parabolic_arch(canvas, cx, spring_y, half_span, rise_ratio, thickness=2):
+    """Parabolic arch — y = a*x²."""
+    h, w = canvas.shape
+    rise = half_span * 2 * rise_ratio
+    pts = []
+    for i in range(100):
+        t = i / 99
+        x = cx - half_span + half_span * 2 * t
+        # Parabola: y = rise * (1 - ((x-cx)/half_span)²)
+        nx = (x - cx) / half_span
+        y = spring_y - rise * (1 - nx * nx)
+        ix, iy = int(x), int(y)
+        if 0 <= ix < w and 0 <= iy < h:
+            pts.append((ix, iy))
+    for i in range(1, len(pts)):
+        cv2.line(canvas, pts[i-1], pts[i], 255, thickness)
+
+
+def render_catenary_arch(canvas, cx, spring_y, half_span, rise_ratio, thickness=2):
+    """Catenary arch — inverted catenary curve (structurally optimal)."""
+    h, w = canvas.shape
+    rise = half_span * 2 * rise_ratio
+    a = rise / (math.cosh(half_span / rise * 1.5) - 1) if rise > 0 else half_span
+    pts = []
+    for i in range(100):
+        t = i / 99
+        x = cx - half_span + half_span * 2 * t
+        nx = (x - cx) / half_span * 1.5
+        y = spring_y - a * (math.cosh(half_span / rise * 1.5) - math.cosh(nx * rise / a)) if a > 0 else spring_y
+        y = max(spring_y - rise * 1.2, min(spring_y, y))
+        ix, iy = int(x), int(y)
+        if 0 <= ix < w and 0 <= iy < h:
+            pts.append((ix, iy))
+    for i in range(1, len(pts)):
+        cv2.line(canvas, pts[i-1], pts[i], 255, thickness)
+
+
+# All curve families for arch elements
+ARCH_CURVE_FAMILIES = {
+    "pointed": lambda c, cx, sy, hs, rr, w: render_arch(c, cx, sy, hs, rr, "pointed", w),
+    "horseshoe": lambda c, cx, sy, hs, rr, w: render_arch(c, cx, sy, hs, rr, "horseshoe", w),
+    "ogee": lambda c, cx, sy, hs, rr, w: render_arch(c, cx, sy, hs, rr, "ogee", w),
+    "semicircular": lambda c, cx, sy, hs, rr, w: render_arch(c, cx, sy, hs, rr, "semicircular", w),
+    "cusped": lambda c, cx, sy, hs, rr, w: render_cusped_arch(c, cx, sy, hs, rr, w),
+    "tudor": lambda c, cx, sy, hs, rr, w: render_tudor_arch(c, cx, sy, hs, rr, w),
+    "elliptical": lambda c, cx, sy, hs, rr, w: render_elliptical_arch(c, cx, sy, hs, rr, w),
+    "parabolic": lambda c, cx, sy, hs, rr, w: render_parabolic_arch(c, cx, sy, hs, rr, w),
+    "catenary": lambda c, cx, sy, hs, rr, w: render_catenary_arch(c, cx, sy, hs, rr, w),
+}
+
+# All curve families for dome elements
+DOME_CURVE_FAMILIES = {
+    "hemisphere": 1.0,
+    "pointed": 1.2,
+    "onion": None,  # special handling
+    "saucer": 0.4,
+    "bulbous": None,  # special handling
+}
+
+
+def find_best_curve_family(name: str, p: dict, ref_edges: np.ndarray, 
+                           canvas_w: int, canvas_h: int) -> tuple:
+    """Test ALL curve families for an element, return best match + loss."""
+    shape = p.get("type", "unknown")
+    weight = max(1, int(p.get("line_weight", 1.5)))
+    
+    best_family = shape
+    best_loss = float("inf")
+    results = []
+    
+    if "arch" in shape or shape in ("tall_arch",):
+        # Test all arch curve families
+        for family_name, render_fn in ARCH_CURVE_FAMILIES.items():
+            canvas = np.zeros((canvas_h, canvas_w), dtype=np.uint8)
+            try:
+                render_fn(canvas, p["cx"], p["spring_y"], p["half_span"],
+                         p.get("rise_ratio", 0.866), weight)
+            except Exception:
+                continue
+            
+            chamfer = chamfer_distance(canvas, ref_edges)
+            iou = edge_iou(canvas, ref_edges)
+            loss = chamfer * (1 - iou)
+            results.append((family_name, loss, chamfer, iou))
+            
+            if loss < best_loss:
+                best_loss = loss
+                best_family = family_name
+    
+    elif "dome" in shape:
+        # Test dome profiles
+        for family_name, h_ratio_override in DOME_CURVE_FAMILIES.items():
+            canvas = np.zeros((canvas_h, canvas_w), dtype=np.uint8)
+            hr = h_ratio_override if h_ratio_override else p.get("h_ratio", 1.0)
+            
+            if family_name == "onion":
+                # Onion: bulge + point
+                pts = []
+                for i in range(100):
+                    t = i / 99
+                    a = math.pi * (1 - t)
+                    r_mod = p["radius"] * (1 + 0.15 * math.sin(a * 2))
+                    x = int(p["cx"] + r_mod * math.cos(a))
+                    y = int(p["cy"] - p["radius"] * 1.1 * math.sin(a))
+                    if 0 <= x < canvas_w and 0 <= y < canvas_h:
+                        pts.append((x, y))
+                for i in range(1, len(pts)):
+                    cv2.line(canvas, pts[i-1], pts[i], 255, weight)
+            elif family_name == "bulbous":
+                pts = []
+                for i in range(100):
+                    t = i / 99
+                    a = math.pi * (1 - t)
+                    r_mod = p["radius"] * (1 + 0.25 * math.sin(a * 1.5))
+                    x = int(p["cx"] + r_mod * math.cos(a))
+                    y = int(p["cy"] - p["radius"] * 0.9 * math.sin(a))
+                    if 0 <= x < canvas_w and 0 <= y < canvas_h:
+                        pts.append((x, y))
+                for i in range(1, len(pts)):
+                    cv2.line(canvas, pts[i-1], pts[i], 255, weight)
+            else:
+                render_dome(canvas, p["cx"], p["cy"], p["radius"], hr, weight)
+            
+            chamfer = chamfer_distance(canvas, ref_edges)
+            iou = edge_iou(canvas, ref_edges)
+            loss = chamfer * (1 - iou)
+            results.append((family_name, loss, chamfer, iou))
+            
+            if loss < best_loss:
+                best_loss = loss
+                best_family = family_name
+    
+    return best_family, best_loss, results
+
+
 def extraction_to_params(extraction: dict, scale: float, ox: float, oy: float) -> dict:
     """Convert extraction elements to optimizable parameter dict."""
     params = {}
@@ -249,7 +466,30 @@ def optimize_params(params: dict, ref_edges: np.ndarray,
                     convergence_threshold: float = 0.1) -> dict:
     """Optimize element parameters via gradient descent against reference edges."""
     
-    print(f"\n  Starting optimization ({max_iter} max iterations, lr={lr})...")
+    # === MULTI-CURVE FAMILY TESTING ===
+    # For each element, test ALL curve types and pick the best match
+    print(f"\n  Testing curve families per element...")
+    for name, p in list(params.items()):
+        best_family, best_loss, results = find_best_curve_family(
+            name, p, ref_edges, canvas_w, canvas_h)
+        
+        if results:
+            results.sort(key=lambda r: r[1])
+            original_type = p.get("type", "unknown")
+            print(f"    {name}:")
+            for fam, loss, chamf, iou in results[:4]:
+                marker = " ← BEST" if fam == best_family else ""
+                print(f"      {fam:15s} loss={loss:8.2f} chamfer={chamf:6.2f} IoU={iou:.4f}{marker}")
+            
+            # Update type if a different curve family won
+            if "arch" in original_type or original_type == "tall_arch":
+                if best_family != original_type.replace("_arch", "").replace("tall_", "pointed"):
+                    print(f"      → RECLASSIFIED: {original_type} → {best_family}_arch")
+                    p["type"] = f"{best_family}_arch"
+            elif "dome" in original_type:
+                p["best_dome_profile"] = best_family
+    
+    print(f"\n  Starting parameter optimization ({max_iter} max iterations, lr={lr})...")
     
     # Flatten params to numpy array for optimization
     param_names = []
