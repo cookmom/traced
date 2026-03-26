@@ -660,12 +660,13 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None, knowledge: dict
         model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
     
     sam2 = build_sam2(model_cfg, checkpoint, device=device)
+    # High-density segmentation for architectural detail
     mask_generator = SAM2AutomaticMaskGenerator(
         model=sam2,
-        points_per_side=32,
-        pred_iou_thresh=0.7,
-        stability_score_thresh=0.85,
-        min_mask_region_area=500,
+        points_per_side=64,          # 4x more seed points (was 32)
+        pred_iou_thresh=0.6,         # Lower threshold to catch more (was 0.7)
+        stability_score_thresh=0.80,  # More permissive (was 0.85)
+        min_mask_region_area=200,     # Catch smaller features (was 500)
     )
     
     # Load image
@@ -684,13 +685,13 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None, knowledge: dict
     
     # Process each mask
     elements = []
-    min_area_pct = 0.005  # Skip segments smaller than 0.5% of image
+    min_area_pct = 0.001  # Catch features as small as 0.1% of image (was 0.5%)
     min_area = img_w * img_h * min_area_pct
     
     for i, mask_data in enumerate(masks):
         if mask_data["area"] < min_area:
             continue
-        if len(elements) >= 30:  # Cap at 30 elements
+        if len(elements) >= 50:  # Cap at 50 elements (was 30)
             break
         
         mask = mask_data["segmentation"].astype(np.uint8)

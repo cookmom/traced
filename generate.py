@@ -474,7 +474,7 @@ function draw(){{
     return html
 
 
-def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, building_name: str, ref_image_path: str = None) -> str:
+def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, building_name: str, ref_image_path: str = None, construction: dict = None) -> str:
     """Generate drawing using ONLY optimized mathematical parameters.
     No edge paths. No contour tracing. Pure compass-and-straightedge geometry."""
     
@@ -589,6 +589,25 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
       {draw}
       return[{ccx:.0f},{ccy:.0f}];
    }}}},""")
+    
+    # === INFERRED CONSTRUCTION (columns, drums, finials, cornices) ===
+    cons = construction.get("construction") if construction else optimized.get("construction")
+    if cons:
+        g = cons.get("ground", {})
+        if g:
+            steps_js.append(f"""  {{name:'GROUND LINE',formula:'base',dur:0.3,bbox:[{int(g.get("x1",20))},{int(g.get("y",1800)-5)},{int(g.get("x2",1060))},{int(g.get("y",1800)+5)}],draw:function(p){{brush.set('2H','#5a5248',2.0);brush.line({g.get("x1",20):.0f},{g.get("y",1800):.0f},{g.get("x1",20):.0f}+({g.get("x2",1060):.0f}-{g.get("x1",20):.0f})*p,{g.get("y",1800):.0f});return[{g.get("x2",1060):.0f},{g.get("y",1800):.0f}];}}}},""")
+        for ci, col in enumerate(cons.get("columns", [])):
+            wt = col.get("line_weight", 1.5); cw = col.get("width", 6)
+            steps_js.append(f"""  {{name:'COL {ci+1}',formula:'column',dur:0.3,bbox:[{int(col["x"]-cw-2)},{int(col["top_y"])},{int(col["x"]+cw+2)},{int(col["bot_y"])}],draw:function(p){{brush.set('2H','#5a5248',{wt});var ey={col["bot_y"]:.0f}-({col["bot_y"]:.0f}-{col["top_y"]:.0f})*p;brush.line({col["x"]-cw/2:.0f},{col["bot_y"]:.0f},{col["x"]-cw/2:.0f},ey);brush.line({col["x"]+cw/2:.0f},{col["bot_y"]:.0f},{col["x"]+cw/2:.0f},ey);return[{col["x"]:.0f},ey];}}}},""")
+        for di, drum in enumerate(cons.get("drums", [])):
+            wt=drum.get("line_weight",1.2);dw=drum.get("width",100);nw=drum.get("n_windows",3)
+            steps_js.append(f"""  {{name:'DRUM {di+1}',formula:'{nw} windows',dur:0.5,bbox:[{int(drum["cx"]-dw/2)},{int(drum["top_y"])},{int(drum["cx"]+dw/2)},{int(drum["bot_y"])}],draw:function(p){{brush.set('2H','#5a5248',{wt});var dl={drum["cx"]-dw/2:.0f},dr={drum["cx"]+dw/2:.0f},dt={drum["top_y"]:.0f},db={drum["bot_y"]:.0f};if(p>0)brush.line(dl,dt,dr,dt);if(p>0.25)brush.line(dr,dt,dr,db);if(p>0.5)brush.line(dr,db,dl,db);if(p>0.75)brush.line(dl,db,dl,dt);return[{drum["cx"]:.0f},{drum["bot_y"]:.0f}];}}}},""")
+        for fi, fin in enumerate(cons.get("finials", [])):
+            wt=fin.get("line_weight",0.8)
+            steps_js.append(f"""  {{name:'FINIAL {fi+1}',formula:'spire+crescent',dur:0.3,bbox:[{int(fin["cx"]-12)},{int(fin["top_y"]-5)},{int(fin["cx"]+12)},{int(fin["bot_y"]+5)}],draw:function(p){{brush.set('2H','#5a5248',{wt});brush.line({fin["cx"]:.0f},{fin["bot_y"]:.0f},{fin["cx"]:.0f},{fin["bot_y"]:.0f}-({fin["bot_y"]:.0f}-{fin["top_y"]:.0f})*Math.min(1,p*2));if(p>0.5){{var cR=7,cPts=[];for(var i=0;i<=12;i++){{var a=-Math.PI/2+Math.PI*(i/12);cPts.push([{fin["cx"]:.0f}+3+cR*Math.cos(a),{fin["top_y"]:.0f}+10+cR*Math.sin(a),0.4]);}}if(cPts.length>=2)brush.spline(cPts,0.3);}}return[{fin["cx"]:.0f},{fin["top_y"]:.0f}];}}}},""")
+        for ki, cor in enumerate(cons.get("cornices", [])):
+            wt=cor.get("line_weight",0.8)
+            steps_js.append(f"""  {{name:'CORNICE',formula:'y={cor["y"]:.0f}',dur:0.2,bbox:[{int(cor["x1"])},{int(cor["y"]-3)},{int(cor["x2"])},{int(cor["y"]+3)}],draw:function(p){{brush.set('2H','#8a8278',{wt});brush.line({cor["x1"]:.0f},{cor["y"]:.0f},{cor["x1"]:.0f}+({cor["x2"]:.0f}-{cor["x1"]:.0f})*p,{cor["y"]:.0f});return[{cor["x2"]:.0f},{cor["y"]:.0f}];}}}},""")
     
     # Wash steps
     wash_start = len(steps_js)
@@ -710,6 +729,7 @@ def main():
     parser.add_argument("--output", default="drawing.html")
     parser.add_argument("--name", default="Building")
     parser.add_argument("--ref-image", default=None, help="Reference image for onion skin overlay (dev mode)")
+    parser.add_argument("--construction", default=None, help="Construction JSON from construct.py")
     args = parser.parse_args()
     
     extraction = json.loads(Path(args.extraction).read_text())
@@ -724,8 +744,13 @@ def main():
         optimized = json.loads(Path(args.optimized).read_text())
         print(f"Using optimized parameters from {args.optimized}")
     
+    construction = None
+    if args.construction and Path(args.construction).exists():
+        construction = json.loads(Path(args.construction).read_text())
+        print(f"Using construction data: {construction.get('construction', {}).get('total_inferred', 0)} inferred elements")
+    
     if optimized:
-        html = generate_from_optimized(optimized, extraction, knowledge, args.name, args.ref_image)
+        html = generate_from_optimized(optimized, extraction, knowledge, args.name, args.ref_image, construction)
     else:
         html = generate_html(extraction, knowledge, args.name)
     
