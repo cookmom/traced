@@ -1002,6 +1002,49 @@ def main():
     print(f"{'='*60}")
     print(js_code)
     
+    # Structural summary
+    sym = extraction.get("symmetry", {})
+    hier = extraction.get("hierarchy", [])
+    dom_lines = extraction.get("dominant_lines", [])
+    
+    print(f"\n{'='*60}")
+    print("STRUCTURAL ANALYSIS:")
+    print(f"{'='*60}")
+    
+    print(f"\n  SYMMETRY — score: {sym.get('symmetry_score', 0)}/100")
+    for pair in sym.get("bilateral_pairs", []):
+        print(f"    {pair['left']} ↔ {pair['right']} (dev: {pair['deviation']:.4f})")
+    
+    print(f"\n  HIERARCHY — {len(hier)} containment relationships")
+    for h in hier[:8]:
+        children_str = ", ".join(h["children"][:4])
+        if len(h["children"]) > 4:
+            children_str += f" +{len(h['children'])-4} more"
+        print(f"    {h['parent']} contains [{children_str}]")
+    
+    print(f"\n  DOMINANT LINES — {len(dom_lines)} structural lines")
+    orientations = {}
+    for l in dom_lines:
+        orientations[l["orientation"]] = orientations.get(l["orientation"], 0) + 1
+    for orient, count in sorted(orientations.items(), key=lambda x: -x[1]):
+        print(f"    {orient:12s} {count:3d} lines")
+    
+    print(f"\n  CURVE GEOMETRY")
+    for e in extraction["elements"]:
+        p = e.get("primitives", {})
+        ag = p.get("arch_geometry")
+        dg = p.get("dome_geometry")
+        up = p.get("upper_profile")
+        parts = []
+        if ag:
+            parts.append(f"arch rise/span={ag['rise_to_span']} ({ag['profile_type']})")
+        if dg:
+            parts.append(f"dome h/d={dg['height_to_diameter']} ({dg['profile_type']})")
+        if up:
+            parts.append(f"profile: {len(up['points'])} pts")
+        if parts:
+            print(f"    {e['name']:25s} {' | '.join(parts)}")
+    
     print(f"\n")
     print(card)
 
