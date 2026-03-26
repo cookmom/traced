@@ -489,6 +489,9 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
     
     params = optimized["params"]
     
+    # Build lookup early — needed for dedup
+    el_lookup = {e["name"]: e for e in extraction.get("elements", [])}
+    
     # === DEDUPLICATION: Remove sub-elements that overlap >70% with parent ===
     def bbox_overlap(a, b):
         """Compute overlap ratio between two elements."""
