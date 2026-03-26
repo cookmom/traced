@@ -21,6 +21,15 @@ import json
 import math
 from pathlib import Path
 
+# Pattern generators
+try:
+    from patterns.muqarnas import generate_muqarnas
+    from patterns.mashrabiya import generate_mashrabiya
+    from patterns.geometric import generate_star_rosette, generate_arabesque
+    HAS_PATTERNS = True
+except ImportError:
+    HAS_PATTERNS = False
+
 CANVAS_W = 1080
 CANVAS_H = 1920
 PHI = (1 + math.sqrt(5)) / 2
@@ -577,6 +586,43 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
       if(rp>0.25)brush.line({p["x"]+p["w"]:.0f},{p["y"]:.0f},{p["x"]+p["w"]:.0f},{p["y"]+p["h"]:.0f});
       if(rp>0.5)brush.line({p["x"]+p["w"]:.0f},{p["y"]+p["h"]:.0f},{p["x"]:.0f},{p["y"]+p["h"]:.0f});
       if(rp>0.75)brush.line({p["x"]:.0f},{p["y"]+p["h"]:.0f},{p["x"]:.0f},{p["y"]:.0f});"""
+        elif HAS_PATTERNS and shape in ("muqarnas", "star_polygon", "rosette"):
+            # Fill with mathematical pattern
+            r = min(bw, bh) / 2
+            n_fold = 12 if "star" in shape else 8
+            pattern_paths = generate_muqarnas(ccx, ccy, r, n_fold=n_fold, n_tiers=3) if shape == "muqarnas" else generate_star_rosette(ccx, ccy, r, n_points=n_fold)
+            pattern_paths = pattern_paths[:60]
+            pkey = f"pattern_{name}"
+            edge_data_all[pkey] = pattern_paths
+            formula = f'{shape} {n_fold}-fold | {layer} wt={weight}'
+            bbox = f'[{int(ccx-r-5)},{int(ccy-r-5)},{int(ccx+r+5)},{int(ccy+r+5)}]'
+            dur = 1.5
+            draw = f"""brush.set('2H','#6a6258',{weight*0.7:.1f});
+      var pat=_data['{pkey}'];if(pat){{var nP=Math.max(1,Math.round(p*pat.length));for(var pi=0;pi<nP;pi++){{var path=pat[pi];if(path&&path.length>=2){{var pts=[];for(var j=0;j<path.length;j++)pts.push([path[j][0],path[j][1],0.3]);if(pts.length>=2)brush.spline(pts,0.3);}}}}}}"""
+        
+        elif HAS_PATTERNS and shape == "mashrabiya":
+            pattern_paths = generate_mashrabiya(bx, by, bw, bh, "hexagonal", max(4, int(bw / 30)))
+            pattern_paths = pattern_paths[:80]
+            pkey = f"pattern_{name}"
+            edge_data_all[pkey] = pattern_paths
+            formula = f'mashrabiya lattice | {layer} wt={weight}'
+            bbox = f'[{int(bx-5)},{int(by-5)},{int(bx+bw+5)},{int(by+bh+5)}]'
+            dur = 1.2
+            draw = f"""brush.set('2H','#7a7268',{weight*0.6:.1f});
+      var pat=_data['{pkey}'];if(pat){{var nP=Math.max(1,Math.round(p*pat.length));for(var pi=0;pi<nP;pi++){{var path=pat[pi];if(path&&path.length>=2){{var pts=[];for(var j=0;j<path.length;j++)pts.push([path[j][0],path[j][1],0.3]);if(pts.length>=2)brush.spline(pts,0.3);}}}}}}"""
+        
+        elif HAS_PATTERNS and shape == "openwork":
+            # Openwork gets arabesque fill
+            pattern_paths = generate_arabesque(bx, by, bw, bh, max(3, int(bw / 60)))
+            pattern_paths = pattern_paths[:40]
+            pkey = f"pattern_{name}"
+            edge_data_all[pkey] = pattern_paths
+            formula = f'openwork arabesque | {layer} wt={weight}'
+            bbox = f'[{int(bx-5)},{int(by-5)},{int(bx+bw+5)},{int(by+bh+5)}]'
+            dur = 1.0
+            draw = f"""brush.set('2H','#8a8278',{weight*0.5:.1f});
+      var pat=_data['{pkey}'];if(pat){{var nP=Math.max(1,Math.round(p*pat.length));for(var pi=0;pi<nP;pi++){{var path=pat[pi];if(path&&path.length>=2){{var pts=[];for(var j=0;j<path.length;j++)pts.push([path[j][0],path[j][1],0.3]);if(pts.length>=2)brush.spline(pts,0.3);}}}}}}"""
+        
         else:
             continue
         
