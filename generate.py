@@ -327,7 +327,7 @@ def generate_html(extraction: dict, knowledge: dict = None, building_name: str =
             ekey = f"edges_{name}"
             edge_data_all[ekey] = scaled_edges
             edge_draw = f"""
-      if(p>0.4){{var edges=_data['{ekey}'];if(edges){{brush.set('2H','#8a8278',{detail_weight:.1f});var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){{var path=edges[ei];if(path&&path.length>=2){{var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}}}"""
+      if(p>0.4){{var edges=_data['{ekey}'];if(edges){{brush.set('2H','#8a8278',{detail_weight:.1f});var ep=(p-0.4)/0.6;var nP=Math.max(1,Math.round(ep*edges.length));for(var ei=0;ei<nP;ei++){{var path=edges[ei];if(path&&path.length>=2){{var pts2=[];for(var pi=0;pi<path.length;pi++)pts2.push([path[pi][0],path[pi][1],0.3]);if(pts2.length>=2)brush.spline(pts2,0.3);}}}}}}}}"""
         
         # Duration
         dur = max(0.3, min(1.8, (len(filtered) + 5) / 12))
