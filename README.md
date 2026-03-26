@@ -389,6 +389,17 @@ Created the **Modulor** — a proportional system based on human body dimensions
   - Depth maps improve SAM segmentation accuracy (foreground/background separation)
   - Creative exploitation: point cloud → procedural drawing with verified 3D depth
   - Export point clouds as artistic elements (stipple drawings from depth data)
+- [ ] **diffvg integration** — true differentiable vector graphics rasterizer (MIT CSAIL)
+  - Bézier curves, circles, lines all differentiable
+  - Backpropagate through rasterizer directly to curve control points
+  - 100x faster convergence vs coordinate descent
+  - GitHub: BachiLi/diffvg, pip installable with C++ build
+- [ ] **Bézier Splatting** (NeurIPS 2025) — sample 2D Gaussians along Bézier curves for ultra-fast high-fidelity VG optimization
+- [ ] **RANSAC primitive fitting** — robust curve fitting that rejects contour noise/outliers
+- [ ] **Geometric constraint satisfaction** — enforce symmetry, alignment, orthogonality, tangency across elements
+- [ ] **Architectural grammar induction** — learn proportional priors from multiple buildings per style
+- [ ] **Perceptual loss (LPIPS)** — weight optimization toward human visual perception, not just edge distance
+- [ ] **Stroke-based rendering** — agent learns to place p5.brush strokes directly
 - [ ] **Film tech scout / recce tool** — SAM 2/3 + LiDAR for location scouting:
   - Infer actual room/building dimensions from single photo + LiDAR
   - Auto-measure ceiling heights, wall widths, door clearances
