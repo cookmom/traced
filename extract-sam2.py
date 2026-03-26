@@ -367,6 +367,88 @@ def fit_primitives(mask: np.ndarray, shape_info: dict) -> dict:
     return result
 
 
+def run_depth_estimation(image_path: str) -> np.ndarray | None:
+    """Run Depth Anything V2 on an image, return normalized depth map."""
+    try:
+        from depth_anything_v2.dpt import DepthAnythingV2
+        import torch
+    except ImportError:
+        print("  Depth Anything V2 not installed — skipping depth estimation")
+        return None
+    
+    try:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Try loading the model
+        model_configs = {
+            'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
+            'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
+            'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
+        }
+        
+        # Try largest first, fall back to smaller
+        model = None
+        for size in ['vitl', 'vitb', 'vits']:
+            try:
+                model = DepthAnythingV2(**model_configs[size])
+                ckpt = f'depth_anything_v2_{size}.pth'
+                script_dir = Path(__file__).parent
+                ckpt_path = script_dir / "checkpoints" / ckpt
+                if ckpt_path.exists():
+                    model.load_state_dict(torch.load(str(ckpt_path), map_location=device, weights_only=True))
+                else:
+                    # Try HuggingFace hub
+                    from huggingface_hub import hf_hub_download
+                    ckpt_path = hf_hub_download(f"depth-anything/Depth-Anything-V2-{size.upper()}", f"{ckpt}", local_dir=str(script_dir / "checkpoints"))
+                    model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True))
+                model = model.to(device).eval()
+                print(f"  Loaded Depth Anything V2 ({size}) on {device}")
+                break
+            except Exception as e:
+                model = None
+                continue
+        
+        if model is None:
+            print("  Could not load any Depth Anything V2 model")
+            return None
+        
+        img = cv2.imread(image_path)
+        if img is None:
+            return None
+        
+        with torch.no_grad():
+            depth = model.infer_image(img)
+        
+        # Normalize to 0-1
+        depth = depth.astype(np.float32)
+        depth = (depth - depth.min()) / max(0.001, depth.max() - depth.min())
+        print(f"  Depth map: {depth.shape}, range [{depth.min():.3f}, {depth.max():.3f}]")
+        return depth
+        
+    except Exception as e:
+        print(f"  Depth estimation failed: {e}")
+        return None
+
+
+def extract_edge_map(image_path: str) -> np.ndarray | None:
+    """Extract Canny edge map from image."""
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return None
+    
+    # Bilateral filter to reduce noise while preserving edges
+    filtered = cv2.bilateralFilter(img, 9, 75, 75)
+    
+    # Multi-scale Canny for both fine and coarse edges
+    edges_fine = cv2.Canny(filtered, 30, 80)
+    edges_coarse = cv2.Canny(filtered, 60, 150)
+    
+    # Combine: fine edges capture ornamental detail, coarse edges capture structure
+    combined = cv2.bitwise_or(edges_fine, edges_coarse)
+    
+    print(f"  Edge map: {combined.shape}, {np.count_nonzero(combined)} edge pixels")
+    return combined
+
+
 def extract_dominant_lines(image_path: str) -> list:
     """Extract dominant structural lines using Hough transform."""
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
@@ -653,6 +735,102 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None) -> dict:
     print("Building hierarchy...")
     result["hierarchy"] = extract_hierarchy(result)
     print(f"  {len(result['hierarchy'])} parent-child relationships")
+    
+    # Depth estimation
+    print("Running depth estimation...")
+    depth_map = run_depth_estimation(image_path)
+    if depth_map is not None:
+        # Assign depth layer to each element
+        print("Assigning depth layers...")
+        for el in elements:
+            bb = el.get("primitives", {}).get("bbox", {})
+            if bb:
+                x, y, w, h = bb["x"], bb["y"], bb["w"], bb["h"]
+                # Sample depth in element's region
+                region = depth_map[y:y+h, x:x+w]
+                if region.size > 0:
+                    mean_depth = float(np.mean(region))
+                    median_depth = float(np.median(region))
+                    el["depth"] = {
+                        "mean": round(mean_depth, 4),
+                        "median": round(median_depth, 4),
+                    }
+        
+        # Sort elements by depth and assign layers
+        depth_elements = [e for e in elements if "depth" in e]
+        if depth_elements:
+            depths = [e["depth"]["median"] for e in depth_elements]
+            min_d, max_d = min(depths), max(depths)
+            depth_range = max(0.001, max_d - min_d)
+            
+            for el in depth_elements:
+                norm_depth = (el["depth"]["median"] - min_d) / depth_range
+                el["depth"]["normalized"] = round(norm_depth, 4)
+                # Assign architectural layer
+                if norm_depth < 0.25:
+                    el["depth"]["layer"] = "foreground_frame"
+                    el["depth"]["line_weight"] = 2.5
+                elif norm_depth < 0.50:
+                    el["depth"]["layer"] = "mid_facade"
+                    el["depth"]["line_weight"] = 1.8
+                elif norm_depth < 0.75:
+                    el["depth"]["layer"] = "background_domes"
+                    el["depth"]["line_weight"] = 1.2
+                else:
+                    el["depth"]["layer"] = "distant_sky"
+                    el["depth"]["line_weight"] = 0.6
+                
+                print(f"    {el['name']:25s} depth={norm_depth:.3f} → {el['depth']['layer']} (weight={el['depth']['line_weight']})")
+        
+        result["depth_available"] = True
+    else:
+        result["depth_available"] = False
+    
+    # Edge extraction per element
+    print("Extracting edge contours per element...")
+    edge_map = extract_edge_map(image_path)
+    if edge_map is not None:
+        for el in elements:
+            bb = el.get("primitives", {}).get("bbox", {})
+            if bb:
+                x, y, w, h = bb["x"], bb["y"], bb["w"], bb["h"]
+                # Crop edge map to element's region
+                region = edge_map[y:y+h, x:x+w]
+                # Find contours in the cropped edge region
+                contours, _ = cv2.findContours(region, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+                # Keep significant contours (>2% of element area)
+                min_len = max(10, (w + h) * 0.04)
+                sig_contours = [c for c in contours if cv2.arcLength(c, False) > min_len]
+                
+                # Convert to normalized drawing paths (0-1 within element bbox)
+                edge_paths = []
+                for c in sorted(sig_contours, key=lambda c: -cv2.arcLength(c, False))[:15]:
+                    epsilon = max(1.0, min(w, h) * 0.01)
+                    simplified = cv2.approxPolyDP(c, epsilon, False)
+                    if len(simplified) >= 2:
+                        path = []
+                        for pt in simplified:
+                            px = round(pt[0][0] / max(1, w), 4)
+                            py = round(pt[0][1] / max(1, h), 4)
+                            path.append([px, py])
+                        edge_paths.append(path)
+                
+                if edge_paths:
+                    el["edge_paths"] = edge_paths
+                    el["edge_path_count"] = len(edge_paths)
+                    # Detail density = edges per pixel area
+                    el["detail_density"] = round(sum(len(p) for p in edge_paths) / max(1, w * h) * 10000, 2)
+        
+        # Report detail density
+        detailed = sorted([e for e in elements if "detail_density" in e], key=lambda e: -e["detail_density"])
+        if detailed:
+            print("  Detail density (high = more ornamental detail):")
+            for e in detailed[:5]:
+                print(f"    {e['name']:25s} density={e['detail_density']:6.2f} paths={e.get('edge_path_count', 0)}")
+        
+        result["edges_available"] = True
+    else:
+        result["edges_available"] = False
     
     return result
 
@@ -945,6 +1123,29 @@ def generate_analysis_card(extraction: dict, building_name: str = "Unknown Build
         lines.append("║" + "    ✓ Pointed arch — Islamic/Gothic tradition".ljust(w) + "║")
     lines.append("║" + " " * w + "║")
     
+    # Depth layers (if available)
+    depth_layers = {}
+    for e in elements:
+        layer = e.get("depth", {}).get("layer", "unknown")
+        if layer != "unknown":
+            depth_layers[layer] = depth_layers.get(layer, 0) + 1
+    if depth_layers:
+        lines.append("║" + "  DEPTH LAYERS".ljust(w) + "║")
+        layer_order = ["foreground_frame", "mid_facade", "background_domes", "distant_sky"]
+        for layer in layer_order:
+            if layer in depth_layers:
+                weight = {"foreground_frame": 2.5, "mid_facade": 1.8, "background_domes": 1.2, "distant_sky": 0.6}.get(layer, 1.0)
+                lines.append("║" + f"    {layer:25s} {depth_layers[layer]:2d} elements (wt={weight})".ljust(w) + "║")
+        lines.append("║" + " " * w + "║")
+    
+    # Detail hotspots
+    detailed = sorted([e for e in elements if "detail_density" in e], key=lambda e: -e["detail_density"])
+    if detailed:
+        lines.append("║" + "  DETAIL HOTSPOTS (draw more detail here)".ljust(w) + "║")
+        for e in detailed[:3]:
+            lines.append("║" + f"    {e['name']:20s} density={e['detail_density']:6.2f}".ljust(w) + "║")
+        lines.append("║" + " " * w + "║")
+    
     # Notable
     lines.append("║" + "  NOTABLE".ljust(w) + "║")
     if has_phi and has_sqrt2 and has_sqrt3:
@@ -1028,6 +1229,25 @@ def main():
         orientations[l["orientation"]] = orientations.get(l["orientation"], 0) + 1
     for orient, count in sorted(orientations.items(), key=lambda x: -x[1]):
         print(f"    {orient:12s} {count:3d} lines")
+    
+    # Depth layers
+    depth_layers = {}
+    for e in extraction["elements"]:
+        layer = e.get("depth", {}).get("layer")
+        if layer:
+            depth_layers.setdefault(layer, []).append(e["name"])
+    if depth_layers:
+        print(f"\n  DEPTH LAYERS")
+        for layer in ["foreground_frame", "mid_facade", "background_domes", "distant_sky"]:
+            if layer in depth_layers:
+                print(f"    {layer:25s} [{', '.join(depth_layers[layer][:4])}]")
+    
+    # Detail hotspots
+    detailed = sorted([e for e in extraction["elements"] if "detail_density" in e], key=lambda e: -e["detail_density"])
+    if detailed:
+        print(f"\n  DETAIL HOTSPOTS")
+        for e in detailed[:5]:
+            print(f"    {e['name']:25s} density={e['detail_density']:6.2f} ({e.get('edge_path_count', 0)} paths)")
     
     print(f"\n  CURVE GEOMETRY")
     for e in extraction["elements"]:
