@@ -534,7 +534,7 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
         is_dup = False
         for kept_name, kept_p in kept.items():
             overlap = bbox_overlap(p, kept_p)
-            if overlap > 0.7:
+            if overlap > 0.5:
                 is_dup = True
                 break
         if is_dup:
@@ -549,20 +549,6 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
     
     # Match params to extraction elements for depth info
     el_lookup = {e["name"]: e for e in extraction.get("elements", [])}
-    
-    # Filter: only keep centered elements (cx 100-700) or very wide ones (span > 400)
-    # This removes right-side noise from optimizer pushing cx to 907/1062
-    filtered_kept = {}
-    for n, p in kept.items():
-        cx = p.get("cx", p.get("x", 540))
-        hs = p.get("half_span", p.get("radius", p.get("w", 0) / 2))
-        span = hs * 2 if "half_span" in p or "radius" in p else p.get("w", 0)
-        # Keep if centered OR if span is very large (walls)
-        if (100 < cx < 700) or span > 400:
-            filtered_kept[n] = p
-        else:
-            print(f"  Skipping off-center: {n} (cx={cx:.0f}, span={span:.0f})")
-    kept = filtered_kept
     
     sorted_names = sorted(kept.keys(), key=lambda n: 
         layer_order.get(el_lookup.get(n, {}).get("depth", {}).get("layer", "mid_facade"), 2))
@@ -711,9 +697,7 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
         g = cons.get("ground", {})
         if g:
             steps_js.append(f"""  {{name:'GROUND LINE',formula:'base',dur:0.3,bbox:[{int(g.get("x1",20))},{int(g.get("y",1800)-5)},{int(g.get("x2",1060))},{int(g.get("y",1800)+5)}],draw:function(p){{brush.set('2H','#5a5248',2.0);brush.line({g.get("x1",20):.0f},{g.get("y",1800):.0f},{g.get("x1",20):.0f}+({g.get("x2",1060):.0f}-{g.get("x1",20):.0f})*p,{g.get("y",1800):.0f});return[{g.get("x2",1060):.0f},{g.get("y",1800):.0f}];}}}},""")
-        # DISABLED: inferred columns create visual noise — need manual placement
-        major_cols = []  # cons.get("columns", [])
-        for ci, col in enumerate(major_cols):
+        for ci, col in enumerate(cons.get("columns", [])):
             wt = col.get("line_weight", 1.5); cw = col.get("width", 6)
             steps_js.append(f"""  {{name:'COL {ci+1}',formula:'column',dur:0.3,bbox:[{int(col["x"]-cw-2)},{int(col["top_y"])},{int(col["x"]+cw+2)},{int(col["bot_y"])}],draw:function(p){{brush.set('2H','#5a5248',{wt});var ey={col["bot_y"]:.0f}-({col["bot_y"]:.0f}-{col["top_y"]:.0f})*p;brush.line({col["x"]-cw/2:.0f},{col["bot_y"]:.0f},{col["x"]-cw/2:.0f},ey);brush.line({col["x"]+cw/2:.0f},{col["bot_y"]:.0f},{col["x"]+cw/2:.0f},ey);return[{col["x"]:.0f},ey];}}}},""")
         for di, drum in enumerate(cons.get("drums", [])):
@@ -724,15 +708,9 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
             fin_range = max(1, fin["bot_y"] - fin["top_y"])
             fin_top_safe = max(20, fin["top_y"])
             steps_js.append(f"""  {{name:'FINIAL {fi+1}',formula:'spire+crescent',dur:0.3,bbox:[{int(fin["cx"]-12)},{int(max(5,fin["top_y"]-5))},{int(fin["cx"]+12)},{int(fin["bot_y"]+5)}],draw:function(p){{brush.set('2H','#5a5248',{wt});var fRange={fin_range:.0f};brush.line({fin["cx"]:.0f},{fin["bot_y"]:.0f},{fin["cx"]:.0f},{fin["bot_y"]:.0f}-fRange*Math.min(1,p*2));if(p>0.5){{var cR=7,cPts=[];for(var i=0;i<=12;i++){{var a=-Math.PI/2+Math.PI*(i/12);cPts.push([{fin["cx"]:.0f}+3+cR*Math.cos(a),{fin_top_safe:.0f}+10+cR*Math.sin(a),0.4]);}}if(cPts.length>=2)brush.spline(cPts,0.3);}}return[{fin["cx"]:.0f},{fin_top_safe:.0f}];}}}},""")
-        # Cap cornices at 8 major ones (sorted by width, widest first)
-        all_cors = cons.get("cornices", [])
-        all_cors_sorted = sorted(all_cors, key=lambda c: abs(c.get("x2", 0) - c.get("x1", 0)), reverse=True)
-        major_cors = all_cors_sorted[:8]
-        for ki, cor in enumerate(major_cors):
+        for ki, cor in enumerate(cons.get("cornices", [])):
             wt=cor.get("line_weight",0.8)
-            x1s = f"({cor['x1']:.0f})" if cor['x1'] < 0 else f"{cor['x1']:.0f}"
-            x2s = f"({cor['x2']:.0f})" if cor['x2'] < 0 else f"{cor['x2']:.0f}"
-            steps_js.append(f"""  {{name:'CORNICE',formula:'y={cor["y"]:.0f}',dur:0.2,bbox:[{int(cor["x1"])},{int(cor["y"]-3)},{int(cor["x2"])},{int(cor["y"]+3)}],draw:function(p){{brush.set('2H','#8a8278',{wt});brush.line({x1s},{cor["y"]:.0f},{x1s}+({x2s}-{x1s})*p,{cor["y"]:.0f});return[{x2s},{cor["y"]:.0f}];}}}},""")
+            steps_js.append(f"""  {{name:'CORNICE',formula:'y={cor["y"]:.0f}',dur:0.2,bbox:[{int(cor["x1"])},{int(cor["y"]-3)},{int(cor["x2"])},{int(cor["y"]+3)}],draw:function(p){{brush.set('2H','#8a8278',{wt});brush.line({cor["x1"]:.0f},{cor["y"]:.0f},{cor["x1"]:.0f}+({cor["x2"]:.0f}-{cor["x1"]:.0f})*p,{cor["y"]:.0f});return[{cor["x2"]:.0f},{cor["y"]:.0f}];}}}},""")
     
     # Wash steps
     wash_start = len(steps_js)
@@ -774,7 +752,7 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
         ext = Path(ref_image_path).suffix.lower().replace(".", "")
         mime = "jpeg" if ext in ("jpg", "jpeg") else ext
         ref_img_css = f"""#ref-overlay{{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start;pointer-events:none;z-index:10}}
-#ref-overlay img{{max-height:100vh;max-width:calc(100vh*9/16);opacity:0.15;object-fit:contain;mix-blend-mode:multiply}}"""
+#ref-overlay img{{max-height:100vh;max-width:calc(100vh*9/16);opacity:0.40;object-fit:contain;mix-blend-mode:multiply}}"""
         ref_img_div = f'<div id="ref-overlay"><img src="data:image/{mime};base64,{b64}"></div>'
         print(f"  Reference overlay: {ref_image_path} (25% opacity)")
     
