@@ -186,8 +186,8 @@ function draw(){{
   translate(-width/2,-height/2);var f3=frameCount-1;if(f3>=totalAnimFrames)f3=totalAnimFrames-1;
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
   background(242,234,218);
-  // Draw source image as grey WEBGL textured plane
-  if(_refImg){{push();translate(W/2,H/2);noStroke();tint(150);texture(_refImg);plane(W,H);pop();}}
+  // Draw source image as WEBGL textured plane
+  if(_refImg){{push();translate(W/2,H/2);noStroke();texture(_refImg);plane(W,H);pop();}}
   for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);var tip=STEPS[activeStep].draw(prog);
   drawAnnotations(activeStep);
