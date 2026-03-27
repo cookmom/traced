@@ -61,7 +61,7 @@ function setup(){var c=createCanvas(W,H,WEBGL);pixelDensity(1);var vh=window.inn
 function draw(){
   translate(-width/2,-height/2);var f3=frameCount-1;if(f3>=totalAnimFrames)f3=totalAnimFrames-1;
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){if(f3>=frameStarts[i]){activeStep=i;break;}}
-  background(242,234,218);if(_refImg){push();tint(255,128);image(_refImg,0,0,W,H);pop();};for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
+  background(242,234,218);if(_refImg){push();tint(160,220);image(_refImg,0,0,W,H);pop();};for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);var tip=STEPS[activeStep].draw(prog);
   drawAnnotations(activeStep);
   if(activeStep!==lastHudStep){createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}
