@@ -697,10 +697,8 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
         g = cons.get("ground", {})
         if g:
             steps_js.append(f"""  {{name:'GROUND LINE',formula:'base',dur:0.3,bbox:[{int(g.get("x1",20))},{int(g.get("y",1800)-5)},{int(g.get("x2",1060))},{int(g.get("y",1800)+5)}],draw:function(p){{brush.set('2H','#5a5248',2.0);brush.line({g.get("x1",20):.0f},{g.get("y",1800):.0f},{g.get("x1",20):.0f}+({g.get("x2",1060):.0f}-{g.get("x1",20):.0f})*p,{g.get("y",1800):.0f});return[{g.get("x2",1060):.0f},{g.get("y",1800):.0f}];}}}},""")
-        # Cap columns at 12 major ones (sorted by height, tallest first)
-        all_cols = cons.get("columns", [])
-        all_cols_sorted = sorted(all_cols, key=lambda c: c.get("bot_y", 0) - c.get("top_y", 0), reverse=True)
-        major_cols = all_cols_sorted[:12]
+        # DISABLED: inferred columns create visual noise — need manual placement
+        major_cols = []  # cons.get("columns", [])
         for ci, col in enumerate(major_cols):
             wt = col.get("line_weight", 1.5); cw = col.get("width", 6)
             steps_js.append(f"""  {{name:'COL {ci+1}',formula:'column',dur:0.3,bbox:[{int(col["x"]-cw-2)},{int(col["top_y"])},{int(col["x"]+cw+2)},{int(col["bot_y"])}],draw:function(p){{brush.set('2H','#5a5248',{wt});var ey={col["bot_y"]:.0f}-({col["bot_y"]:.0f}-{col["top_y"]:.0f})*p;brush.line({col["x"]-cw/2:.0f},{col["bot_y"]:.0f},{col["x"]-cw/2:.0f},ey);brush.line({col["x"]+cw/2:.0f},{col["bot_y"]:.0f},{col["x"]+cw/2:.0f},ey);return[{col["x"]:.0f},ey];}}}},""")
