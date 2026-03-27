@@ -8,7 +8,20 @@ def generate_html(optimized, name="Building", ref_image_path=None):
     H = optimized['canvas']['h']
     primitives = optimized['primitives']
     
-    # Build arc point arrays and drawing steps
+    # Sort: bottom→top, right→left (like a right-handed draftsman)
+    def sort_key(p):
+        params = p['params']
+        if p['type'] == 'line':
+            cy = max(params['y1'], params['y2'])  # bottom-most point
+            cx = max(params['x1'], params['x2'])
+        else:
+            cy = params['cy'] + params['radius']  # bottom of arc
+            cx = params['cx'] + params['radius']
+        return (-cy, -cx)  # negative = bottom first, right first
+    
+    primitives = sorted(primitives, key=sort_key)
+    
+    # Build drawing steps
     curve_defs = []
     steps_js = []
     for p in primitives:
@@ -24,21 +37,30 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             cx,cy,r = params['cx'],params['cy'],params['radius']
             start,sweep = params['start_angle'],params['sweep']
             sweep_deg = abs(math.degrees(sweep))
-            n_pts = max(30, int(sweep_deg/3))
-            vn = f'pts_{p["name"].replace("-","_")}'
             is_circ = sweep_deg > 350
-            if is_circ:
-                actual_sweep = 2*math.pi*(1 if sweep>0 else -1)
-                extra = 3
-                curve_defs.append(f"var {vn}=[];for(var j=0;j<={n_pts+extra};j++){{var t=j/{n_pts};var a={start:.6f}+{actual_sweep:.6f}*t;{vn}.push([{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a),1.0]);}}")
-            else:
-                curve_defs.append(f"var {vn}=[];for(var j=0;j<={n_pts};j++){{var t=j/{n_pts};var a={start:.6f}+{sweep:.6f}*t;{vn}.push([{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}}")
             bbox = f'[{int(cx-r-10)},{int(cy-r-10)},{int(cx+r+10)},{int(cy+r+10)}]'
             formula = f'circle R={r:.0f}' if is_circ else f'arc {sweep_deg:.0f}° R={r:.0f}'
-            dur = max(0.3, sweep_deg/300)
-            steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{brush.set('2H','#c0392b',2.0);if({vn}){{var n=Math.max(3,Math.round(p*{vn}.length));var sub={vn}.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);var tip=sub[sub.length-1];return [tip[0],tip[1]];}}}}}}""")
+            dur = max(0.5, sweep_deg/250)
+            d = r * 2
+            # Compass drawing: plant at center, sweep the arc progressively
+            # p5.js arc(x, y, w, h, start, stop) in WEBGL mode
+            if is_circ:
+                actual_sweep = 2 * math.pi
+                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
+      push();stroke(192,57,43);strokeWeight(2);noFill();
+      arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},{start:.4f}+{actual_sweep:.4f}*p);
+      pop();
+      var a={start:.4f}+{actual_sweep:.4f}*p;return [{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a)];
+    }}}}""")
+            else:
+                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
+      push();stroke(192,57,43);strokeWeight(2);noFill();
+      arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},{start:.4f}+{sweep:.4f}*p);
+      pop();
+      var a={start:.4f}+{sweep:.4f}*p;return [{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a)];
+    }}}}""")
     
-    all_curves = "\n    ".join(curve_defs)
+    all_curves = "\n    ".join(curve_defs) if curve_defs else "// no curve arrays needed"
     all_steps = ",\n".join(steps_js)
     
     # Source image as HTML img (grey, behind canvas)
