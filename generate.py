@@ -697,7 +697,11 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
         g = cons.get("ground", {})
         if g:
             steps_js.append(f"""  {{name:'GROUND LINE',formula:'base',dur:0.3,bbox:[{int(g.get("x1",20))},{int(g.get("y",1800)-5)},{int(g.get("x2",1060))},{int(g.get("y",1800)+5)}],draw:function(p){{brush.set('2H','#5a5248',2.0);brush.line({g.get("x1",20):.0f},{g.get("y",1800):.0f},{g.get("x1",20):.0f}+({g.get("x2",1060):.0f}-{g.get("x1",20):.0f})*p,{g.get("y",1800):.0f});return[{g.get("x2",1060):.0f},{g.get("y",1800):.0f}];}}}},""")
-        for ci, col in enumerate(cons.get("columns", [])):
+        # Cap columns at 12 major ones (sorted by height, tallest first)
+        all_cols = cons.get("columns", [])
+        all_cols_sorted = sorted(all_cols, key=lambda c: c.get("bot_y", 0) - c.get("top_y", 0), reverse=True)
+        major_cols = all_cols_sorted[:12]
+        for ci, col in enumerate(major_cols):
             wt = col.get("line_weight", 1.5); cw = col.get("width", 6)
             steps_js.append(f"""  {{name:'COL {ci+1}',formula:'column',dur:0.3,bbox:[{int(col["x"]-cw-2)},{int(col["top_y"])},{int(col["x"]+cw+2)},{int(col["bot_y"])}],draw:function(p){{brush.set('2H','#5a5248',{wt});var ey={col["bot_y"]:.0f}-({col["bot_y"]:.0f}-{col["top_y"]:.0f})*p;brush.line({col["x"]-cw/2:.0f},{col["bot_y"]:.0f},{col["x"]-cw/2:.0f},ey);brush.line({col["x"]+cw/2:.0f},{col["bot_y"]:.0f},{col["x"]+cw/2:.0f},ey);return[{col["x"]:.0f},ey];}}}},""")
         for di, drum in enumerate(cons.get("drums", [])):
@@ -708,7 +712,11 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
             fin_range = max(1, fin["bot_y"] - fin["top_y"])
             fin_top_safe = max(20, fin["top_y"])
             steps_js.append(f"""  {{name:'FINIAL {fi+1}',formula:'spire+crescent',dur:0.3,bbox:[{int(fin["cx"]-12)},{int(max(5,fin["top_y"]-5))},{int(fin["cx"]+12)},{int(fin["bot_y"]+5)}],draw:function(p){{brush.set('2H','#5a5248',{wt});var fRange={fin_range:.0f};brush.line({fin["cx"]:.0f},{fin["bot_y"]:.0f},{fin["cx"]:.0f},{fin["bot_y"]:.0f}-fRange*Math.min(1,p*2));if(p>0.5){{var cR=7,cPts=[];for(var i=0;i<=12;i++){{var a=-Math.PI/2+Math.PI*(i/12);cPts.push([{fin["cx"]:.0f}+3+cR*Math.cos(a),{fin_top_safe:.0f}+10+cR*Math.sin(a),0.4]);}}if(cPts.length>=2)brush.spline(cPts,0.3);}}return[{fin["cx"]:.0f},{fin_top_safe:.0f}];}}}},""")
-        for ki, cor in enumerate(cons.get("cornices", [])):
+        # Cap cornices at 8 major ones (sorted by width, widest first)
+        all_cors = cons.get("cornices", [])
+        all_cors_sorted = sorted(all_cors, key=lambda c: abs(c.get("x2", 0) - c.get("x1", 0)), reverse=True)
+        major_cors = all_cors_sorted[:8]
+        for ki, cor in enumerate(major_cors):
             wt=cor.get("line_weight",0.8)
             x1s = f"({cor['x1']:.0f})" if cor['x1'] < 0 else f"{cor['x1']:.0f}"
             x2s = f"({cor['x2']:.0f})" if cor['x2'] < 0 else f"{cor['x2']:.0f}"
