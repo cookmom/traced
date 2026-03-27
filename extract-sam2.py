@@ -22,6 +22,9 @@ import numpy as np
 import cv2
 from PIL import Image
 
+# Ruler-and-compass shape classifier (primitives-first, no architectural bias)
+from classify_rc import classify_shape_rc as classify_shape
+
 # ============================================================
 # CONSTANTS
 # ============================================================
@@ -51,9 +54,10 @@ def find_closest_ratio(value: float) -> dict:
     }
 
 
-def classify_shape(mask: np.ndarray, knowledge: dict = None) -> dict:
-    """Classify a mask's shape into 17 architectural types.
-    If knowledge is provided, uses building style to bias classification."""
+def _classify_shape_old(mask: np.ndarray, knowledge: dict = None) -> dict:
+    """OLD classifier — kept for reference only. Not called.
+    Replaced by classify_rc.classify_shape_rc imported at top.
+    """
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return {"type": "unknown", "circularity": 0, "solidity": 0, "convexity": 0, "aspect": 0, "confidence": 0, "vertices": 0}
@@ -76,7 +80,23 @@ def classify_shape(mask: np.ndarray, knowledge: dict = None) -> dict:
     approx = cv2.approxPolyDP(largest, epsilon, True)
     n_vertices = len(approx)
     
-    # Analyze upper vs lower half curvature (for arch type detection)
+    # Fit minimum enclosing circle — how well does a circle fit?
+    (mc_x, mc_y), mc_r = cv2.minEnclosingCircle(largest)
+    circle_area = math.pi * mc_r * mc_r
+    circle_fit = area / circle_area if circle_area > 0 else 0  # 1.0 = perfect circle
+    
+    # Fit minimum area rectangle — how well does a rectangle fit?
+    if len(largest) >= 5:
+        rect = cv2.minAreaRect(largest)
+        rect_w, rect_h = rect[1]
+        rect_area = rect_w * rect_h
+        rect_fit = area / rect_area if rect_area > 0 else 0  # 1.0 = perfect rectangle
+        rect_aspect = min(rect_w, rect_h) / max(rect_w, rect_h) if max(rect_w, rect_h) > 0 else 0
+    else:
+        rect_fit = 0
+        rect_aspect = 0
+    
+    # Analyze upper vs lower half curvature (for arch detection)
     mid_y = y + h // 2
     upper_pts = [p for p in largest if p[0][1] < mid_y]
     lower_pts = [p for p in largest if p[0][1] >= mid_y]
@@ -90,94 +110,89 @@ def classify_shape(mask: np.ndarray, knowledge: dict = None) -> dict:
     shape_type = "unknown"
     confidence = 0.5
     
-    # === CIRCLE (near-perfect) ===
-    if circularity > 0.85 and convexity > 0.95 and 0.85 < aspect < 1.15:
+    # ============================================================
+    # PRIMITIVES FIRST — pure geometry, no architectural bias
+    # ============================================================
+    
+    # 1. CIRCLE — high circularity, near-square aspect, good circle fit
+    if circularity > 0.82 and 0.80 < aspect < 1.20 and circle_fit > 0.85:
         shape_type = "circle"
-        confidence = circularity
+        confidence = min(circularity, circle_fit)
     
-    # === DOME (circular, convex, wider-than-tall or equal) ===
-    elif circularity > 0.7 and convexity > 0.88 and aspect >= 0.7:
-        shape_type = "dome"
-        confidence = circularity
+    # 2. ELLIPSE — high circularity but non-square aspect
+    elif circularity > 0.82 and circle_fit > 0.80 and (aspect < 0.80 or aspect > 1.20):
+        shape_type = "ellipse"
+        confidence = circularity * 0.9
     
-    # === OCTAGON (7-9 vertices, high solidity) ===
-    elif 7 <= n_vertices <= 9 and solidity > 0.75 and convexity > 0.85:
-        shape_type = "octagon"
-        confidence = 0.8
+    # 3. SQUARE — 4 corners, near-equal sides, high rect fit
+    elif n_vertices <= 5 and rect_fit > 0.85 and rect_aspect > 0.80 and solidity > 0.80:
+        shape_type = "square"
+        confidence = rect_fit * rect_aspect
     
-    # === CRESCENT (thin, curved, low solidity) ===
-    elif solidity < 0.35 and convexity < 0.6 and circularity > 0.2:
-        shape_type = "crescent"
-        confidence = 0.6
+    # 4. RECTANGLE — 4 corners, high rect fit, non-square
+    elif n_vertices <= 5 and rect_fit > 0.82 and solidity > 0.75:
+        shape_type = "rectangle"
+        confidence = rect_fit
     
-    # === STAR POLYGON (many vertices, moderate solidity) ===
-    elif n_vertices >= 10 and 0.4 < solidity < 0.75 and convexity < 0.8:
+    # 5. TRIANGLE — 3 vertices
+    elif n_vertices == 3 and solidity > 0.5:
+        shape_type = "triangle"
+        confidence = 0.75
+    
+    # 6. REGULAR POLYGON — many vertices, high symmetry
+    elif 5 <= n_vertices <= 9 and solidity > 0.75 and convexity > 0.85:
+        if n_vertices <= 6:
+            shape_type = "hexagon"
+        elif n_vertices <= 8:
+            shape_type = "octagon"
+        else:
+            shape_type = "polygon"
+        confidence = 0.7
+    
+    # 7. STAR — many vertices, moderate solidity (concave)
+    elif n_vertices >= 8 and 0.4 < solidity < 0.75 and convexity < 0.8:
         shape_type = "star_polygon"
         confidence = 0.65
     
-    # === OPENWORK / GRILLE (low solidity, complex outline) ===
+    # ============================================================
+    # COMPOUND SHAPES — detected from primitive features
+    # ============================================================
+    
+    # 8. ARCH — curved top, straight sides/bottom, open below
+    elif circularity > 0.4 and upper_circularity > 0.3 and solidity > 0.5:
+        # Classify arch subtype by proportions
+        if aspect < 0.6:
+            shape_type = "tall_arch" if upper_circularity < 0.5 else "pointed_arch"
+            confidence = 0.65
+        elif aspect > 1.3:
+            shape_type = "horseshoe_arch"
+            confidence = 0.65
+        else:
+            shape_type = "arch"
+            confidence = 0.6
+    
+    # 9. DOME — like a circle/ellipse but only the top half is curved
+    #    (distinguished from circle by having flat/open bottom)
+    elif circularity > 0.6 and convexity > 0.85 and upper_circularity > 0.4:
+        shape_type = "dome"
+        confidence = circularity * 0.85
+    
+    # 10. THIN/TALL — column-like
+    elif aspect < 0.3 and h > 2.5 * w and convexity > 0.7:
+        shape_type = "column"
+        confidence = 0.7
+    
+    # 11. WIDE/SHORT — band-like
+    elif aspect > 3.0 and solidity > 0.7:
+        shape_type = "horizontal_band"
+        confidence = 0.7
+    
+    # 12. LOW SOLIDITY — openwork/lattice
     elif solidity < 0.45:
         shape_type = "openwork"
         confidence = 0.55
     
-    # === MINARET (extremely tall and thin, at edge of image) ===
-    elif aspect < 0.15 and h > 3 * w and convexity > 0.7:
-        shape_type = "minaret"
-        confidence = 0.75
-    
-    # === COLUMN (tall and thin) ===
-    elif aspect < 0.3 and h > 2.5 * w and convexity > 0.7:
-        shape_type = "column"
-        confidence = 0.75
-    
-    # === HORIZONTAL BAND (very wide, short) ===
-    elif aspect > 3.0 and solidity > 0.7:
-        shape_type = "horizontal_band"
-        confidence = 0.8
-    
-    # === SPANDREL (triangular, 3 vertices) ===
-    elif n_vertices == 3 and solidity > 0.6:
-        shape_type = "spandrel"
-        confidence = 0.7
-    
-    # === ARCH TYPES (curved top, open bottom or sides) ===
-    elif circularity > 0.4 and upper_circularity > 0.3:
-        if aspect < 0.7:
-            # Taller than wide
-            if upper_circularity > 0.5 and solidity > 0.7:
-                shape_type = "pointed_arch"
-                confidence = 0.7
-            else:
-                shape_type = "tall_arch"
-                confidence = 0.65
-        elif aspect > 1.2:
-            # Wider than tall — could be horseshoe
-            if convexity > 0.85 and circularity > 0.55:
-                shape_type = "horseshoe_arch"
-                confidence = 0.65
-            else:
-                shape_type = "arch"
-                confidence = 0.6
-        else:
-            # Near-square arch opening — could be ogee
-            if convexity < 0.85 and upper_circularity > 0.3:
-                shape_type = "ogee_arch"
-                confidence = 0.55
-            else:
-                shape_type = "arch"
-                confidence = 0.6
-    
-    # === SQUARE (rectangle with near-equal sides) ===
-    elif solidity > 0.8 and 0.85 < aspect < 1.15 and circularity < 0.7:
-        shape_type = "square"
-        confidence = 0.75
-    
-    # === RECTANGLE (high solidity, clear corners) ===
-    elif solidity > 0.75 and circularity < 0.7 and n_vertices <= 6:
-        shape_type = "rectangle"
-        confidence = 0.7
-    
-    # === WALL (large area, blocky) ===
+    # 13. LARGE FILL — wall/panel
     elif solidity > 0.7 and circularity < 0.5:
         shape_type = "wall"
         confidence = 0.6
@@ -705,7 +720,7 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None, knowledge: dict
             import torch
         except ImportError:
             print("SAM 2 not installed. Falling back to OpenCV.")
-            return run_opencv_extraction(image_path)
+            return run_opencv_extraction(image_path, knowledge)
     
     # Find checkpoint
     if checkpoint is None:
@@ -722,7 +737,7 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None, knowledge: dict
     
     if checkpoint is None:
         print("No SAM 2 checkpoint found. Run setup-sam2.sh first.")
-        return run_opencv_extraction(image_path)
+        return run_opencv_extraction(image_path, knowledge)
     
     print(f"Loading SAM 2 from {checkpoint}...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -1034,7 +1049,7 @@ def run_sam2_extraction(image_path: str, checkpoint: str = None, knowledge: dict
     return result
 
 
-def run_opencv_extraction(image_path: str) -> dict:
+def run_opencv_extraction(image_path: str, knowledge=None) -> dict:
     """Fallback: OpenCV contour detection."""
     print("Running OpenCV fallback...")
     img = cv2.imread(image_path)
