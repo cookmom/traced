@@ -46,18 +46,22 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             # p5.js arc(x, y, w, h, start, stop) in WEBGL mode
             if is_circ:
                 actual_sweep = 2 * math.pi
-                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
+                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},_lastP:0,draw:function(p){{
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},{start:.4f}+{actual_sweep:.4f}*p);
-      pop();
-      var a={start:.4f}+{actual_sweep:.4f}*p;return [{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a)];
+      var s0={start:.4f}+{actual_sweep:.4f}*this._lastP;
+      var s1={start:.4f}+{actual_sweep:.4f}*p;
+      if(s1>s0+0.01)arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},s0,s1);
+      this._lastP=p;pop();
+      return [{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1)];
     }}}}""")
             else:
-                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
+                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},_lastP:0,draw:function(p){{
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},{start:.4f}+{sweep:.4f}*p);
-      pop();
-      var a={start:.4f}+{sweep:.4f}*p;return [{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a)];
+      var s0={start:.4f}+{sweep:.4f}*this._lastP;
+      var s1={start:.4f}+{sweep:.4f}*p;
+      if(Math.abs(s1-s0)>0.01)arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},Math.min(s0,s1),Math.max(s0,s1));
+      this._lastP=p;pop();
+      return [{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1)];
     }}}}""")
     
     all_curves = "\n    ".join(curve_defs) if curve_defs else "// no curve arrays needed"
@@ -143,10 +147,12 @@ function setup(){{
   window.addEventListener('resize',function(){{_hs=document.getElementById('wrap').offsetWidth/W;}});
 }}
 function draw(){{
-  translate(-width/2,-height/2);clear();
+  translate(-width/2,-height/2);
+  // No clear — strokes accumulate on transparent canvas over the grey source image
   var f3=Math.min(frameCount-1,totalAnimFrames-1);
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
-  for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
+  // Draw newly completed steps (only on the frame they complete)
+  for(var i=0;i<activeStep;i++){{if(!STEPS[i]._done){{STEPS[i].draw(1);STEPS[i]._done=true;}}}}
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);
   var tip=STEPS[activeStep].draw(prog);
   if(activeStep!==lastHudStep){{createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}}

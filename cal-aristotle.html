@@ -34,60 +34,76 @@ var W=1080,H=1920,cx=W/2;
     // no curve arrays needed
 var FPS=30,_hs=1,trackBox=null,pencilDot=null;
 var STEPS=[
-  {name:'ARC 13',formula:'circle R=82',dur:1.44,bbox:[59,1681,244,1866],draw:function(p){
+  {name:'ARC 13',formula:'circle R=82',dur:1.44,bbox:[59,1681,244,1866],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(151.9,1773.9,164.9,164.9,0.0000,0.0000+6.2832*p);
-      pop();
-      var a=0.0000+6.2832*p;return [151.9+82.5*Math.cos(a),1773.9+82.5*Math.sin(a)];
+      var s0=0.0000+6.2832*this._lastP;
+      var s1=0.0000+6.2832*p;
+      if(s1>s0+0.01)arc(151.9,1773.9,164.9,164.9,s0,s1);
+      this._lastP=p;pop();
+      return [151.9+82.5*Math.cos(s1),1773.9+82.5*Math.sin(s1)];
     }},
-  {name:'ARC 14',formula:'circle R=43',dur:1.44,bbox:[98,1720,205,1827],draw:function(p){
+  {name:'ARC 14',formula:'circle R=43',dur:1.44,bbox:[98,1720,205,1827],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(151.9,1773.9,86.9,86.9,0.0000,0.0000+6.2832*p);
-      pop();
-      var a=0.0000+6.2832*p;return [151.9+43.4*Math.cos(a),1773.9+43.4*Math.sin(a)];
+      var s0=0.0000+6.2832*this._lastP;
+      var s1=0.0000+6.2832*p;
+      if(s1>s0+0.01)arc(151.9,1773.9,86.9,86.9,s0,s1);
+      this._lastP=p;pop();
+      return [151.9+43.4*Math.cos(s1),1773.9+43.4*Math.sin(s1)];
     }},
-  {name:'ARC 12',formula:'circle R=57',dur:1.44,bbox:[62,1216,197,1351],draw:function(p){
+  {name:'ARC 12',formula:'circle R=57',dur:1.44,bbox:[62,1216,197,1351],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(129.9,1283.9,115.0,115.0,0.0000,0.0000+6.2832*p);
-      pop();
-      var a=0.0000+6.2832*p;return [129.9+57.5*Math.cos(a),1283.9+57.5*Math.sin(a)];
+      var s0=0.0000+6.2832*this._lastP;
+      var s1=0.0000+6.2832*p;
+      if(s1>s0+0.01)arc(129.9,1283.9,115.0,115.0,s0,s1);
+      this._lastP=p;pop();
+      return [129.9+57.5*Math.cos(s1),1283.9+57.5*Math.sin(s1)];
     }},
-  {name:'ARC 9',formula:'arc 277° R=78',dur:1.11,bbox:[244,909,419,1084],draw:function(p){
+  {name:'ARC 9',formula:'arc 277° R=78',dur:1.11,bbox:[244,909,419,1084],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(332.0,997.4,155.1,155.1,-2.4188,-2.4188+4.8353*p);
-      pop();
-      var a=-2.4188+4.8353*p;return [332.0+77.5*Math.cos(a),997.4+77.5*Math.sin(a)];
+      var s0=-2.4188+4.8353*this._lastP;
+      var s1=-2.4188+4.8353*p;
+      if(Math.abs(s1-s0)>0.01)arc(332.0,997.4,155.1,155.1,Math.min(s0,s1),Math.max(s0,s1));
+      this._lastP=p;pop();
+      return [332.0+77.5*Math.cos(s1),997.4+77.5*Math.sin(s1)];
     }},
-  {name:'ARC 8',formula:'arc 301° R=69',dur:1.20,bbox:[254,916,412,1074],draw:function(p){
+  {name:'ARC 8',formula:'arc 301° R=69',dur:1.20,bbox:[254,916,412,1074],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(333.6,995.6,137.5,137.5,-1.0580,-1.0580+5.2552*p);
-      pop();
-      var a=-1.0580+5.2552*p;return [333.6+68.7*Math.cos(a),995.6+68.7*Math.sin(a)];
+      var s0=-1.0580+5.2552*this._lastP;
+      var s1=-1.0580+5.2552*p;
+      if(Math.abs(s1-s0)>0.01)arc(333.6,995.6,137.5,137.5,Math.min(s0,s1),Math.max(s0,s1));
+      this._lastP=p;pop();
+      return [333.6+68.7*Math.cos(s1),995.6+68.7*Math.sin(s1)];
     }},
-  {name:'ARC 7',formula:'arc 313° R=61',dur:1.25,bbox:[263,925,406,1068],draw:function(p){
+  {name:'ARC 7',formula:'arc 313° R=61',dur:1.25,bbox:[263,925,406,1068],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(335.3,997.0,122.9,122.9,1.2100,1.2100+5.4562*p);
-      pop();
-      var a=1.2100+5.4562*p;return [335.3+61.5*Math.cos(a),997.0+61.5*Math.sin(a)];
+      var s0=1.2100+5.4562*this._lastP;
+      var s1=1.2100+5.4562*p;
+      if(Math.abs(s1-s0)>0.01)arc(335.3,997.0,122.9,122.9,Math.min(s0,s1),Math.max(s0,s1));
+      this._lastP=p;pop();
+      return [335.3+61.5*Math.cos(s1),997.0+61.5*Math.sin(s1)];
     }},
   {name:'LINE 11',formula:'line L=119',dur:0.24,bbox:[271,1051,400,1062],draw:function(p){brush.set('2H','#c0392b',2.0);brush.line(395,1056,395+-119*p,1056+1*p);return [395+-119*p,1056+1*p];}},
   {name:'LINE 4',formula:'line L=126',dur:0.25,bbox:[689,965,825,976],draw:function(p){brush.set('2H','#c0392b',2.0);brush.line(820,971,820+-126*p,971+1*p);return [820+-126*p,971+1*p];}},
   {name:'LINE 5',formula:'line L=124',dur:0.25,bbox:[686,856,759,973],draw:function(p){brush.set('2H','#c0392b',2.0);brush.line(754,861,754+-63*p,861+107*p);return [754+-63*p,861+107*p];}},
   {name:'LINE 6',formula:'line L=117',dur:0.23,bbox:[751,860,820,971],draw:function(p){brush.set('2H','#c0392b',2.0);brush.line(756,866,756+59*p,866+101*p);return [756+59*p,866+101*p];}},
   {name:'LINE 10',formula:'line L=119',dur:0.24,bbox:[271,932,400,943],draw:function(p){brush.set('2H','#c0392b',2.0);brush.line(395,939,395+-119*p,939+-1*p);return [395+-119*p,939+-1*p];}},
-  {name:'ARC 1',formula:'arc 86° R=134',dur:0.50,bbox:[177,411,464,698],draw:function(p){
+  {name:'ARC 1',formula:'arc 86° R=134',dur:0.50,bbox:[177,411,464,698],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(321.1,554.9,267.7,267.7,-2.3043,-2.3043+1.5032*p);
-      pop();
-      var a=-2.3043+1.5032*p;return [321.1+133.9*Math.cos(a),554.9+133.9*Math.sin(a)];
+      var s0=-2.3043+1.5032*this._lastP;
+      var s1=-2.3043+1.5032*p;
+      if(Math.abs(s1-s0)>0.01)arc(321.1,554.9,267.7,267.7,Math.min(s0,s1),Math.max(s0,s1));
+      this._lastP=p;pop();
+      return [321.1+133.9*Math.cos(s1),554.9+133.9*Math.sin(s1)];
     }},
   {name:'LINE 2',formula:'line L=102',dur:0.20,bbox:[314,453,413,514],draw:function(p){brush.set('2H','#c0392b',2.0);brush.line(408,458,408+-89*p,458+51*p);return [408+-89*p,458+51*p];}},
   {name:'LINE 3',formula:'line L=102',dur:0.20,bbox:[222,449,320,511],draw:function(p){brush.set('2H','#c0392b',2.0);brush.line(316,506,316+-88*p,506+-52*p);return [316+-88*p,506+-52*p];}},
-  {name:'ARC 0',formula:'arc 286° R=48',dur:1.14,bbox:[262,397,378,513],draw:function(p){
+  {name:'ARC 0',formula:'arc 286° R=48',dur:1.14,bbox:[262,397,378,513],_lastP:0,draw:function(p){
       push();stroke(192,57,43);strokeWeight(2);noFill();
-      arc(320.5,455.1,96.1,96.1,0.6518,0.6518+4.9923*p);
-      pop();
-      var a=0.6518+4.9923*p;return [320.5+48.1*Math.cos(a),455.1+48.1*Math.sin(a)];
+      var s0=0.6518+4.9923*this._lastP;
+      var s1=0.6518+4.9923*p;
+      if(Math.abs(s1-s0)>0.01)arc(320.5,455.1,96.1,96.1,Math.min(s0,s1),Math.max(s0,s1));
+      this._lastP=p;pop();
+      return [320.5+48.1*Math.cos(s1),455.1+48.1*Math.sin(s1)];
     }}
 ];
 var PAUSE_S=0.2;
@@ -123,10 +139,12 @@ function setup(){
   window.addEventListener('resize',function(){_hs=document.getElementById('wrap').offsetWidth/W;});
 }
 function draw(){
-  translate(-width/2,-height/2);clear();
+  translate(-width/2,-height/2);
+  // No clear — strokes accumulate on transparent canvas over the grey source image
   var f3=Math.min(frameCount-1,totalAnimFrames-1);
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){if(f3>=frameStarts[i]){activeStep=i;break;}}
-  for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
+  // Draw newly completed steps (only on the frame they complete)
+  for(var i=0;i<activeStep;i++){if(!STEPS[i]._done){STEPS[i].draw(1);STEPS[i]._done=true;}}
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);
   var tip=STEPS[activeStep].draw(prog);
   if(activeStep!==lastHudStep){createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}
