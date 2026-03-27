@@ -263,93 +263,95 @@ def _is_continuous(points, threshold=8.0, is_circular=False):
     return True
 
 
+def _cluster_edges(points, max_gap=4.0):
+    """Split edge pixels into connected blobs."""
+    from scipy.spatial import KDTree
+    if len(points) == 0:
+        return []
+    tree = KDTree(points)
+    visited = np.zeros(len(points), dtype=bool)
+    blobs = []
+    for si in range(len(points)):
+        if visited[si]:
+            continue
+        blob = []
+        queue = [si]
+        visited[si] = True
+        while queue:
+            idx = queue.pop(0)
+            blob.append(idx)
+            for ni in tree.query_ball_point(points[idx], max_gap):
+                if not visited[ni]:
+                    visited[ni] = True
+                    queue.append(ni)
+        blobs.append(np.array(blob))
+    return blobs
+
+
+def _fit_blob(points, min_line_length=30):
+    """Fit the best primitive to a connected blob."""
+    if len(points) < 10:
+        return None
+    lr = fit_line_ransac(points)
+    lc = np.sum(lr[2]) if lr else 0
+    cr = fit_circle_ransac(points, max_radius=1000)
+    cc = np.sum(cr[4]) if cr else 0
+    min_pts = max(10, len(points) * 0.3)
+    
+    line_wins = False
+    if lr and lc >= min_pts:
+        p1, p2, mask = lr
+        if np.linalg.norm(p2-p1) >= min_line_length:
+            if cr is None or lc >= cc * 0.5:
+                line_wins = True
+    
+    if line_wins:
+        p1, p2, mask = lr
+        return {
+            'type': 'line',
+            'params': {'x1':float(p1[0]),'y1':float(p1[1]),'x2':float(p2[0]),'y2':float(p2[1])},
+            'n_inliers': int(lc), 'mask': mask
+        }
+    elif cc >= min_pts:
+        center, radius, start, sweep, mask = cr
+        return {
+            'type': 'arc',
+            'params': {'cx':float(center[0]),'cy':float(center[1]),'radius':float(radius),
+                       'start_angle':float(start),'sweep':float(sweep)},
+            'n_inliers': int(cc), 'mask': mask
+        }
+    return None
+
+
 def detect_primitives(edge_points, image_shape, min_line_length=30):
-    """
-    The core algorithm:
-    1. Try to fit a line (RANSAC)
-    2. Try to fit a circle (RANSAC)
-    3. Keep whichever explains more points
-    4. Remove those points
-    5. Repeat until no more fits
-    """
+    """Cluster edge pixels into blobs, fit primitives per blob."""
     H, W = image_shape
-    remaining = edge_points.copy()
+    blobs = _cluster_edges(edge_points, max_gap=4.0)
+    blobs = [b for b in blobs if len(b) >= 10]
+    print(f"  {len(blobs)} connected blobs")
+    
     primitives = []
+    unexplained = 0
     
-    max_iterations = 50  # safety limit
-    
-    for iteration in range(max_iterations):
-        if len(remaining) < 10:
-            break
-        
-        # Try line
-        line_result = fit_line_ransac(remaining)
-        line_count = np.sum(line_result[2]) if line_result else 0
-        
-        # Try circle
-        circle_result = fit_circle_ransac(remaining, max_radius=max(W, H) * 0.4)
-        circle_count = np.sum(circle_result[4]) if circle_result else 0
-        
-        # Parsimony: prefer lines over circles (fewer parameters = simpler truth)
-        # A line wins if it explains at least 60% as many points as the circle,
-        # because a large arc can always approximate a line but not vice versa.
-        min_points = max(15, len(remaining) * 0.02)
-        
-        line_wins = False
-        if line_result and line_count >= min_points:
-            p1, p2, mask = line_result
-            length = np.linalg.norm(p2 - p1)
-            if length >= min_line_length:
-                # Line wins if: more inliers than circle, OR
-                # at least 60% of circle's inliers (parsimony preference)
-                if circle_result is None or line_count >= circle_count * 0.5:
-                    line_wins = True
-        
-        if line_wins:
-            p1, p2, mask = line_result
-            # Continuity check: are inliers a continuous chain?
-            inlier_pts = remaining[mask]
-            if not _is_continuous(inlier_pts, threshold=8.0):
-                # Scattered points — not a real line, skip and remove anyway
-                remaining = remaining[~mask]
-                continue
-            length = np.linalg.norm(p2 - p1)
+    for bi in blobs:
+        blob_pts = edge_points[bi]
+        remaining = blob_pts.copy()
+        for _ in range(5):
+            if len(remaining) < 10:
+                break
+            result = _fit_blob(remaining, min_line_length)
+            if result is None:
+                break
             primitives.append({
-                'type': 'line',
-                'params': {
-                    'x1': float(p1[0]), 'y1': float(p1[1]),
-                    'x2': float(p2[0]), 'y2': float(p2[1])
-                },
-                'n_inliers': int(line_count),
-                'name': f'line_{len(primitives)}'
+                'type': result['type'],
+                'params': result['params'],
+                'n_inliers': result['n_inliers'],
+                'name': f'{result["type"]}_{len(primitives)}'
             })
-            remaining = remaining[~mask]
-            
-        elif circle_count >= min_points:
-            center, radius, start, sweep, mask = circle_result
-            # Continuity check
-            inlier_pts = remaining[mask]
-            if not _is_continuous(inlier_pts, threshold=8.0):
-                remaining = remaining[~mask]
-                continue
-            primitives.append({
-                'type': 'arc',
-                'params': {
-                    'cx': float(center[0]), 'cy': float(center[1]),
-                    'radius': float(radius),
-                    'start_angle': float(start),
-                    'sweep': float(sweep)
-                },
-                'n_inliers': int(circle_count),
-                'name': f'arc_{len(primitives)}'
-            })
-            remaining = remaining[~mask]
-            
-        else:
-            # Neither fit explains enough points — done
-            break
+            remaining = remaining[~result['mask']]
+        unexplained += len(remaining)
     
-    return primitives, remaining
+    return primitives, unexplained
 
 
 def _dedup_stroke_width(primitives, stroke_width=12):
@@ -426,7 +428,7 @@ def main():
     n_lines = sum(1 for p in primitives if p['type'] == 'line')
     n_arcs = sum(1 for p in primitives if p['type'] == 'arc')
     print(f"\nFound {len(primitives)} primitives: {n_lines} lines + {n_arcs} arcs")
-    print(f"Unexplained edge pixels: {len(remaining)} ({100*len(remaining)/len(edge_points):.1f}%)")
+    print(f"Unexplained edge pixels: {remaining} ({100*remaining/len(edge_points):.1f}%)")
     
     for p in primitives:
         params = p['params']
@@ -443,7 +445,7 @@ def main():
         'primitives': primitives,
         'source_primitives': primitives,  # for overlay
         'edge_count': len(edge_points),
-        'unexplained': len(remaining),
+        'unexplained': remaining,
     }
     
     Path(args.output).write_text(json.dumps(output, indent=2))
