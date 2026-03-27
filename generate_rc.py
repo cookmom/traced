@@ -18,6 +18,40 @@ def generate_html(optimized: dict, name: str = "Building", ref_image_path: str =
     H = optimized['canvas']['h']
     primitives = optimized['primitives']
     
+    # Build source shape drawing code (grey, drawn before redraw)
+    # Uses the SAME primitives but with original (pre-optimized) params from extraction
+    source_prims = optimized.get('source_primitives', [])
+    source_draw_lines = []
+    for sp in source_prims:
+        params = sp['params']
+        if sp['type'] == 'arc':
+            sweep = params['sweep']
+            n_pts = max(30, int(abs(math.degrees(sweep)) / 3))
+            is_circ = abs(math.degrees(sweep)) > 350
+            extra = 3 if is_circ else 0
+            actual_sweep = 2 * math.pi * (1 if sweep > 0 else -1) if is_circ else sweep
+            source_draw_lines.append(f"var _sp=[];for(var j=0;j<={n_pts+extra};j++){{var t=j/{n_pts};var a={params['start_angle']:.6f}+{actual_sweep:.6f}*t;_sp.push([{params['cx']:.1f}+{params['radius']:.1f}*Math.cos(a),{params['cy']:.1f}+{params['radius']:.1f}*Math.sin(a),1.0]);}}")
+            source_draw_lines.append("brush.set('2H','#aaaaaa',3.0);if(_sp.length>=2)brush.spline(_sp,0.3);")
+        elif sp['type'] == 'line':
+            source_draw_lines.append(f"brush.set('2H','#aaaaaa',3.0);brush.line({params['x1']:.0f},{params['y1']:.0f},{params['x2']:.0f},{params['y2']:.0f});")
+    source_draw_js = "\n      ".join(source_draw_lines) if source_draw_lines else "// no source shapes"
+    
+    # Native p5 drawing (non-brush, for persistent source overlay)
+    source_native_lines = []
+    for sp in source_prims:
+        params = sp['params']
+        if sp['type'] == 'arc':
+            sweep_deg = abs(math.degrees(params['sweep']))
+            if sweep_deg > 350:
+                source_native_lines.append(f"ellipse({params['cx']:.1f},{params['cy']:.1f},{params['radius']*2:.1f},{params['radius']*2:.1f});")
+            else:
+                start = params['start_angle']
+                end = start + params['sweep']
+                source_native_lines.append(f"arc({params['cx']:.1f},{params['cy']:.1f},{params['radius']*2:.1f},{params['radius']*2:.1f},{start:.4f},{end:.4f});")
+        elif sp['type'] == 'line':
+            source_native_lines.append(f"line({params['x1']:.0f},{params['y1']:.0f},{params['x2']:.0f},{params['y2']:.0f});")
+    source_native_js = "\n  ".join(source_native_lines) if source_native_lines else "// no source"
+    
     # Build drawing steps
     steps_js = []
     curve_defs = []
@@ -163,7 +197,12 @@ function setup(){{var c=createCanvas(W,H,WEBGL);pixelDensity(1);var vh=window.in
 function draw(){{
   translate(-width/2,-height/2);var f3=frameCount-1;if(f3>=totalAnimFrames)f3=totalAnimFrames-1;
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
-  background(242,234,218);{ref_draw};for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
+  background(242,234,218);{ref_draw};
+  // Draw source shapes in grey (every frame, using native p5 strokes)
+  push();stroke(170);strokeWeight(4);noFill();
+  {source_native_js}
+  pop();
+  for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);var tip=STEPS[activeStep].draw(prog);
   drawAnnotations(activeStep);
   if(activeStep!==lastHudStep){{createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}}

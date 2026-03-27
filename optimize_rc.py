@@ -446,14 +446,23 @@ def main():
     primitives = dedup_primitives(primitives)
     print(f"After dedup: {len(primitives)} ({sum(1 for p in primitives if p['type']=='line')} lines, {sum(1 for p in primitives if p['type']=='arc')} arcs)")
     
+    # Save source primitives (pre-optimization) for overlay
+    import copy
+    source_primitives = copy.deepcopy(primitives)
+    
     # Optimize
     print("\nOptimizing...")
     primitives = optimize_primitives(primitives, edge_pts, image_shape)
+    
+    # Filter source primitives to only include ones that survived optimization
+    kept_names = {p['name'] for p in primitives}
+    source_kept = [sp for sp in source_primitives if sp['name'] in kept_names]
     
     # Output
     output = {
         'canvas': {'w': W, 'h': H},
         'primitives': primitives,
+        'source_primitives': source_kept,
         'edge_count': len(edge_pts),
     }
     
