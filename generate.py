@@ -550,6 +550,20 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
     # Match params to extraction elements for depth info
     el_lookup = {e["name"]: e for e in extraction.get("elements", [])}
     
+    # Filter: only keep centered elements (cx 100-700) or very wide ones (span > 400)
+    # This removes right-side noise from optimizer pushing cx to 907/1062
+    filtered_kept = {}
+    for n, p in kept.items():
+        cx = p.get("cx", p.get("x", 540))
+        hs = p.get("half_span", p.get("radius", p.get("w", 0) / 2))
+        span = hs * 2 if "half_span" in p or "radius" in p else p.get("w", 0)
+        # Keep if centered OR if span is very large (walls)
+        if (100 < cx < 700) or span > 400:
+            filtered_kept[n] = p
+        else:
+            print(f"  Skipping off-center: {n} (cx={cx:.0f}, span={span:.0f})")
+    kept = filtered_kept
+    
     sorted_names = sorted(kept.keys(), key=lambda n: 
         layer_order.get(el_lookup.get(n, {}).get("depth", {}).get("layer", "mid_facade"), 2))
     
