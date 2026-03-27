@@ -372,6 +372,57 @@ def optimize_primitives(primitives, edge_pts, image_shape, max_iter=100, lr=1.0)
     return primitives
 
 
+def dedup_primitives(primitives, line_thresh=15, arc_thresh=20):
+    """Remove duplicate primitives that are too close to each other.
+    
+    Lines within line_thresh px (midpoint distance) are duplicates.
+    Arcs within arc_thresh px (center distance) AND similar radius are duplicates.
+    Keep the first (largest-area source element) of each group.
+    """
+    kept = []
+    
+    for p in primitives:
+        is_dup = False
+        params = p['params']
+        
+        for k in kept:
+            kp = k['params']
+            
+            if p['type'] == 'line' and k['type'] == 'line':
+                # Compare midpoints
+                mx1 = (params['x1'] + params['x2']) / 2
+                my1 = (params['y1'] + params['y2']) / 2
+                mx2 = (kp['x1'] + kp['x2']) / 2
+                my2 = (kp['y1'] + kp['y2']) / 2
+                dist = math.sqrt((mx1-mx2)**2 + (my1-my2)**2)
+                if dist < line_thresh:
+                    # Also check similar angle
+                    a1 = math.atan2(params['y2']-params['y1'], params['x2']-params['x1'])
+                    a2 = math.atan2(kp['y2']-kp['y1'], kp['x2']-kp['x1'])
+                    angle_diff = abs(a1 - a2) % math.pi
+                    if angle_diff < 0.2 or angle_diff > math.pi - 0.2:
+                        is_dup = True
+                        break
+            
+            elif p['type'] == 'arc' and k['type'] == 'arc':
+                cx_dist = abs(params['cx'] - kp['cx'])
+                cy_dist = abs(params['cy'] - kp['cy'])
+                r_diff = abs(params['radius'] - kp['radius'])
+                center_dist = math.sqrt(cx_dist**2 + cy_dist**2)
+                if center_dist < arc_thresh and r_diff < params['radius'] * 0.2:
+                    is_dup = True
+                    break
+        
+        if not is_dup:
+            kept.append(p)
+    
+    skipped = len(primitives) - len(kept)
+    if skipped > 0:
+        print(f"  Dedup: {len(primitives)} → {len(kept)} primitives ({skipped} duplicates removed)")
+    
+    return kept
+
+
 def main():
     parser = argparse.ArgumentParser(description="Ruler-and-compass optimizer")
     parser.add_argument("--extraction", required=True)
@@ -387,6 +438,10 @@ def main():
     # Convert extraction to primitives
     primitives = primitives_from_extraction(extraction, image_shape)
     print(f"Primitives: {len(primitives)} ({sum(1 for p in primitives if p['type']=='line')} lines, {sum(1 for p in primitives if p['type']=='arc')} arcs)")
+    
+    # Deduplicate overlapping primitives before optimization
+    primitives = dedup_primitives(primitives)
+    print(f"After dedup: {len(primitives)} ({sum(1 for p in primitives if p['type']=='line')} lines, {sum(1 for p in primitives if p['type']=='arc')} arcs)")
     
     # Optimize
     print("\nOptimizing...")

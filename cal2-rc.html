@@ -37,45 +37,29 @@ var pts_circle_4 = [];
     for(var j=0;j<=119;j++){var t=j/119;
       var a=0.010955+6.234341*t;
       pts_circle_4.push([320.1+132.2*Math.cos(a),450.8+132.2*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-var pts_circle_5 = [];
-    for(var j=0;j<=119;j++){var t=j/119;
-      var a=-0.007064+6.271751*t;
-      pts_circle_5.push([320.0+132.3*Math.cos(a),450.7+132.3*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 var pts_arch_7_arc = [];
     for(var j=0;j<=57;j++){var t=j/57;
-      var a=-3.071216+3.014697*t;
+      var a=-3.070165+3.015719*t;
       pts_arch_7_arc.push([499.7+121.0*Math.cos(a),1287.8+121.0*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-var pts_arch_8_arc = [];
-    for(var j=0;j<=57;j++){var t=j/57;
-      var a=-3.066026+3.008197*t;
-      pts_arch_8_arc.push([499.0+121.9*Math.cos(a),1288.2+121.9*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-var pts_sub_rectangle_0_circle_1 = [];
-    for(var j=0;j<=120;j++){var t=j/120;
-      var a=0.000000+6.283185*t;
-      pts_sub_rectangle_0_circle_1.push([319.8+131.4*Math.cos(a),443.7+131.4*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 var pts_sub_dome_1_dome_2 = [];
-    for(var j=0;j<=28;j++){var t=j/28;
-      var a=2.446269+-1.478349*t;
-      pts_sub_dome_1_dome_2.push([337.5+139.0*Math.cos(a),180.7+139.0*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
+    for(var j=0;j<=20;j++){var t=j/20;
+      var a=1.878878+-0.457015*t;
+      pts_sub_dome_1_dome_2.push([337.5+139.0*Math.cos(a),180.8+139.0*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 var pts_sub_dome_1_dome_3 = [];
-    for(var j=0;j<=50;j++){var t=j/50;
-      var a=2.287222+-2.667998*t;
+    for(var j=0;j<=37;j++){var t=j/37;
+      var a=1.867617+-1.964709*t;
       pts_sub_dome_1_dome_3.push([83.0+161.5*Math.cos(a),209.9+161.5*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 var pts_sub_dome_1_dome_4 = [];
-    for(var j=0;j<=53;j++){var t=j/53;
-      var a=3.143968+-2.817190*t;
+    for(var j=0;j<=48;j++){var t=j/48;
+      var a=3.021707+-2.544551*t;
       pts_sub_dome_1_dome_4.push([337.0+163.5*Math.cos(a),212.6+163.5*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
-var pts_sub_dome_1_dome_5 = [];
-    for(var j=0;j<=58;j++){var t=j/58;
-      var a=3.141593+-3.038473*t;
-      pts_sub_dome_1_dome_5.push([338.0+173.5*Math.cos(a),225.6+173.5*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 var pts_sub_dome_1_arch_6_arc = [];
-    for(var j=0;j<=27;j++){var t=j/27;
-      var a=-1.269778+-1.450940*t;
+    for(var j=0;j<=30;j++){var t=j/30;
+      var a=-1.395348+-1.573136*t;
       pts_sub_dome_1_arch_6_arc.push([210.5+86.0*Math.cos(a),82.1+86.0*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 var pts_sub_dome_1_pointed_arch_7_arc = [];
-    for(var j=0;j<=50;j++){var t=j/50;
-      var a=0.258011+2.625570*t;
+    for(var j=0;j<=49;j++){var t=j/49;
+      var a=0.205644+2.568974*t;
       pts_sub_dome_1_pointed_arch_7_arc.push([82.5+85.3*Math.cos(a),-21.8+85.3*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
 
 var ANNOT_FONT=13,_dimLabels=[],_lastDimStep=-1;
@@ -137,42 +121,6 @@ var STEPS=[
       var sub=pts_circle_4.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
       var tip=sub[sub.length-1];return [tip[0],tip[1]];}
    }},
-  {name:'CIRCLE 5',formula:'circle R=132',dur:1.20,
-   bbox:[177,308,462,592],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      if(pts_circle_5){var n=Math.max(3,Math.round(p*pts_circle_5.length));
-      var sub=pts_circle_5.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];return [tip[0],tip[1]];}
-   }},
-  {name:'SQUARE 6 LINE 0',formula:'line L=223',dur:0.45,
-   bbox:[644,793,877,803],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(649,798,649+223*p,798+0*p);
-      return [649+223*p,798+0*p];
-   }},
-  {name:'SQUARE 6 LINE 1',formula:'line L=226',dur:0.45,
-   bbox:[867,793,877,1029],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(872,798,872+0*p,798+226*p);
-      return [872+0*p,798+226*p];
-   }},
-  {name:'SQUARE 6 LINE 2',formula:'line L=223',dur:0.45,
-   bbox:[644,1019,877,1029],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(872,1024,872+-223*p,1024+0*p);
-      return [872+-223*p,1024+0*p];
-   }},
-  {name:'SQUARE 6 LINE 3',formula:'line L=226',dur:0.45,
-   bbox:[644,793,654,1029],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(649,1024,649+0*p,1024+-226*p);
-      return [649+0*p,1024+-226*p];
-   }},
   {name:'ARCH 7 ARC',formula:'arc 173° R=121',dur:0.58,
    bbox:[368,1156,630,1418],
    draw:function(p){
@@ -195,65 +143,7 @@ var STEPS=[
       brush.line(621,1288,621+0*p,1288+216*p);
       return [621+0*p,1288+216*p];
    }},
-  {name:'ARCH 8 ARC',formula:'arc 172° R=122',dur:0.57,
-   bbox:[367,1156,630,1420],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      if(pts_arch_8_arc){var n=Math.max(3,Math.round(p*pts_arch_8_arc.length));
-      var sub=pts_arch_8_arc.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];return [tip[0],tip[1]];}
-   }},
-  {name:'ARCH 8 LEG L',formula:'line L=215',dur:0.43,
-   bbox:[372,1283,382,1508],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(377,1288,377+0*p,1288+215*p);
-      return [377+0*p,1288+215*p];
-   }},
-  {name:'ARCH 8 LEG R',formula:'line L=215',dur:0.43,
-   bbox:[615,1283,625,1508],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(621,1288,621+0*p,1288+215*p);
-      return [621+0*p,1288+215*p];
-   }},
-  {name:'SUB RECTANGLE 0 SQUARE 0 LINE 0',formula:'line L=222',dur:0.44,
-   bbox:[645,787,877,797],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(650,792,650+222*p,792+0*p);
-      return [650+222*p,792+0*p];
-   }},
-  {name:'SUB RECTANGLE 0 SQUARE 0 LINE 1',formula:'line L=224',dur:0.45,
-   bbox:[867,787,877,1021],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(872,792,872+0*p,792+224*p);
-      return [872+0*p,792+224*p];
-   }},
-  {name:'SUB RECTANGLE 0 SQUARE 0 LINE 2',formula:'line L=222',dur:0.44,
-   bbox:[645,1011,877,1021],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(872,1016,872+-222*p,1016+0*p);
-      return [872+-222*p,1016+0*p];
-   }},
-  {name:'SUB RECTANGLE 0 SQUARE 0 LINE 3',formula:'line L=224',dur:0.45,
-   bbox:[645,787,655,1021],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      brush.line(650,1016,650+0*p,1016+-224*p);
-      return [650+0*p,1016+-224*p];
-   }},
-  {name:'SUB RECTANGLE 0 CIRCLE 1',formula:'circle R=131',dur:1.20,
-   bbox:[178,302,461,585],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      if(pts_sub_rectangle_0_circle_1){var n=Math.max(3,Math.round(p*pts_sub_rectangle_0_circle_1.length));
-      var sub=pts_sub_rectangle_0_circle_1.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];return [tip[0],tip[1]];}
-   }},
-  {name:'SUB DOME 1 DOME 2',formula:'arc 85° R=139',dur:0.30,
+  {name:'SUB DOME 1 DOME 2',formula:'arc 26° R=139',dur:0.30,
    bbox:[188,31,486,329],
    draw:function(p){
       brush.set('2H','#5a5248',1.5);
@@ -261,7 +151,7 @@ var STEPS=[
       var sub=pts_sub_dome_1_dome_2.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
       var tip=sub[sub.length-1];return [tip[0],tip[1]];}
    }},
-  {name:'SUB DOME 1 DOME 3',formula:'arc 153° R=162',dur:0.51,
+  {name:'SUB DOME 1 DOME 3',formula:'arc 113° R=162',dur:0.38,
    bbox:[-88,38,254,381],
    draw:function(p){
       brush.set('2H','#5a5248',1.5);
@@ -269,7 +159,7 @@ var STEPS=[
       var sub=pts_sub_dome_1_dome_3.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
       var tip=sub[sub.length-1];return [tip[0],tip[1]];}
    }},
-  {name:'SUB DOME 1 DOME 4',formula:'arc 161° R=164',dur:0.54,
+  {name:'SUB DOME 1 DOME 4',formula:'arc 146° R=164',dur:0.49,
    bbox:[163,39,510,386],
    draw:function(p){
       brush.set('2H','#5a5248',1.5);
@@ -277,15 +167,7 @@ var STEPS=[
       var sub=pts_sub_dome_1_dome_4.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
       var tip=sub[sub.length-1];return [tip[0],tip[1]];}
    }},
-  {name:'SUB DOME 1 DOME 5',formula:'arc 174° R=174',dur:0.58,
-   bbox:[154,42,521,409],
-   draw:function(p){
-      brush.set('2H','#5a5248',1.5);
-      if(pts_sub_dome_1_dome_5){var n=Math.max(3,Math.round(p*pts_sub_dome_1_dome_5.length));
-      var sub=pts_sub_dome_1_dome_5.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
-      var tip=sub[sub.length-1];return [tip[0],tip[1]];}
-   }},
-  {name:'SUB DOME 1 ARCH 6 ARC',formula:'arc 83° R=86',dur:0.30,
+  {name:'SUB DOME 1 ARCH 6 ARC',formula:'arc 90° R=86',dur:0.30,
    bbox:[114,-13,306,178],
    draw:function(p){
       brush.set('2H','#5a5248',1.5);
@@ -307,7 +189,7 @@ var STEPS=[
       brush.line(297,82,297+0*p,82+326*p);
       return [297+0*p,82+326*p];
    }},
-  {name:'SUB DOME 1 POINTED ARCH 7 ARC',formula:'arc 150° R=85',dur:0.50,
+  {name:'SUB DOME 1 POINTED ARCH 7 ARC',formula:'arc 147° R=85',dur:0.49,
    bbox:[-12,-117,177,73],
    draw:function(p){
       brush.set('2H','#5a5248',1.5);
@@ -345,7 +227,7 @@ function setup(){var c=createCanvas(W,H,WEBGL);pixelDensity(1);var vh=window.inn
 function draw(){
   translate(-width/2,-height/2);var f3=frameCount-1;if(f3>=totalAnimFrames)f3=totalAnimFrames-1;
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){if(f3>=frameStarts[i]){activeStep=i;break;}}
-  background(242,234,218);if(_refImg){push();tint(255,76);image(_refImg,0,0,W,H);pop();};for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
+  background(242,234,218);if(_refImg){push();tint(255,128);image(_refImg,0,0,W,H);pop();};for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);var tip=STEPS[activeStep].draw(prog);
   drawAnnotations(activeStep);
   if(activeStep!==lastHudStep){createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}
