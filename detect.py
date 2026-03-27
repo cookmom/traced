@@ -20,10 +20,19 @@ from pathlib import Path
 
 
 def find_edge_pixels(image_path):
-    """Truth 1: edges exist where intensity changes."""
+    """Find stroke centerline pixels.
+    
+    Instead of Canny (which finds both sides of a stroke), threshold to find
+    the dark stroke pixels, then skeletonize to get the single-pixel centerline.
+    This gives exactly ONE line/arc per drawn stroke."""
+    from skimage.morphology import skeletonize
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    edges = cv2.Canny(img, 50, 150)
-    ey, ex = np.where(edges > 0)
+    # Threshold: find dark strokes on light background
+    # Use Otsu to auto-determine threshold
+    _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # Skeletonize the strokes to single-pixel centerlines
+    skeleton = skeletonize(binary > 0).astype(np.uint8) * 255
+    ey, ex = np.where(skeleton > 0)
     return np.column_stack([ex, ey]).astype(float), img.shape[:2]
 
 
@@ -339,9 +348,6 @@ def detect_primitives(edge_points, image_shape, min_line_length=30):
         else:
             # Neither fit explains enough points — done
             break
-    
-    # Dedup: merge primitives that are stroke-width duplicates
-    primitives = _dedup_stroke_width(primitives, stroke_width=12)
     
     return primitives, remaining
 
