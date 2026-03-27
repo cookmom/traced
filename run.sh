@@ -24,6 +24,15 @@ echo "  Name:  ${NAME}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# Ensure we're on main branch
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "▸ Switching to main branch (was on ${CURRENT_BRANCH})..."
+    git stash -q 2>/dev/null || true
+    git checkout main -q 2>/dev/null || git checkout -b main -q
+    git stash pop -q 2>/dev/null || true
+fi
+
 echo "▸ [1/6] Preprocess → 1080×1920"
 python preprocess.py --image "$IMAGE" --output preprocessed.jpg
 echo ""
@@ -56,7 +65,7 @@ echo ""
 cp "$OUTPUT" szm.html
 
 # Auto-deploy
-echo "▸ Deploying..."
+echo "▸ Deploying to GitHub Pages..."
 git add "$OUTPUT" szm.html preprocessed.jpg 2>/dev/null || true
 git commit -m "traced: ${NAME} ${VERSION}" 2>/dev/null || true
 git push origin main 2>/dev/null && {
@@ -67,6 +76,6 @@ git push origin main 2>/dev/null && {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 } || {
     echo ""
-    echo "⚠ Push failed. Fix: git remote set-url origin git@github.com:cookmom/traced.git"
+    echo "⚠ Push failed. Run once: git remote set-url origin git@github.com:cookmom/traced.git"
     echo "  File saved locally: $OUTPUT"
 }
