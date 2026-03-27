@@ -52,7 +52,7 @@ def _thin_fallback(edges):
     return skeleton
 
 
-def fit_line_ransac(points, n_iter=200, threshold=3.0):
+def fit_line_ransac(points, n_iter=500, threshold=2.0):
     """Fit a line to points using RANSAC. Returns (p1, p2, inlier_mask) or None."""
     if len(points) < 2:
         return None
@@ -302,7 +302,7 @@ def detect_primitives(edge_points, image_shape, min_line_length=30):
             if length >= min_line_length:
                 # Line wins if: more inliers than circle, OR
                 # at least 60% of circle's inliers (parsimony preference)
-                if circle_result is None or line_count >= circle_count * 0.6:
+                if circle_result is None or line_count >= circle_count * 0.5:
                     line_wins = True
         
         if line_wins:
