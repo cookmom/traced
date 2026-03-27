@@ -211,7 +211,7 @@ def classify_from_primitives(primitives, contour, mask_shape):
         'bbox': (x, y, w, h),
     }
     
-    # CIRCLE: one arc sweeping ~360°
+    # CIRCLE: one arc sweeping ~360°, OR high circularity + near-square aspect
     if len(arcs) >= 1:
         largest_arc = max(arcs, key=lambda a: abs(a['sweep']))
         if abs(largest_arc['sweep']) > math.radians(300) and total_line_length < perimeter * 0.15:
@@ -219,6 +219,17 @@ def classify_from_primitives(primitives, contour, mask_shape):
             result['center'] = largest_arc['center']
             result['radius'] = largest_arc['radius']
             result['confidence'] = min(0.95, abs(largest_arc['sweep']) / (2 * math.pi))
+            return result
+    
+    # CIRCLE fallback: moderate+ circularity, near-square, dominated by arcs (filled circle masks)
+    if circularity > 0.55 and 0.80 < aspect < 1.20 and len(lines) == 0:
+        # Fit circle to the full contour
+        center, radius = fit_circle(contour.reshape(-1, 2))
+        if center is not None and radius > 5:
+            result['type'] = 'circle'
+            result['center'] = (float(center[0]), float(center[1]))
+            result['radius'] = float(radius)
+            result['confidence'] = circularity
             return result
     
     # ELLIPSE

@@ -364,10 +364,26 @@ def optimize_primitives(primitives, edge_pts, image_shape, max_iter=100, lr=1.0)
         if pi < 20:  # don't spam for tons of primitives
             print(f"    {prim['name']}: {initial_chamfer:.1f} → {final:.1f}")
     
+    # Remove primitives with poor fit (chamfer > 50px = not matching any edge)
+    good = []
+    for prim in primitives:
+        pts = render_primitive(prim)
+        if len(pts) > 0:
+            c = chamfer_distance_fast(pts, edge_pts, edge_tree)
+            if c < 50:
+                good.append(prim)
+            else:
+                print(f"    DROPPED {prim['name']}: chamfer={c:.1f} (too far from edges)")
+    
+    if len(good) < len(primitives):
+        print(f"  Filtered: {len(primitives)} → {len(good)} primitives")
+    primitives = good
+    
     # Final total chamfer
-    all_pts = np.vstack([render_primitive(p) for p in primitives if len(render_primitive(p)) > 0])
-    final_chamfer = chamfer_distance_fast(all_pts, edge_pts, edge_tree)
-    print(f"  Final chamfer: {final_chamfer:.2f} (improvement: {(1-final_chamfer/initial_chamfer)*100:.1f}%)")
+    if primitives:
+        all_pts = np.vstack([render_primitive(p) for p in primitives if len(render_primitive(p)) > 0])
+        final_chamfer = chamfer_distance_fast(all_pts, edge_pts, edge_tree)
+        print(f"  Final chamfer: {final_chamfer:.2f} (improvement: {(1-final_chamfer/initial_chamfer)*100:.1f}%)")
     
     return primitives
 
