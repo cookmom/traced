@@ -287,14 +287,26 @@ def classify_from_primitives(primitives, contour, mask_shape):
     return result
 
 
-def classify_shape_rc(mask, knowledge=None):
-    """Main entry: ruler-and-compass shape classification."""
+def classify_shape_rc(mask, knowledge=None, source_image=None):
+    """Main entry: ruler-and-compass shape classification.
+    
+    If source_image is provided, runs Canny edge detection within the mask
+    region and decomposes the EDGES (not the filled mask contour).
+    This gives clean line/arc detection even for filled SAM masks.
+    """
+    # Get the mask contour for basic metrics (area, bbox, etc.)
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return {"type": "unknown", "circularity": 0, "solidity": 0, "convexity": 0, "aspect": 0, "confidence": 0, "vertices": 0}
     
     largest = max(contours, key=cv2.contourArea)
-    primitives = decompose_contour(largest)
+    
+    # If we have the source image, use Canny edges within the mask region
+    if source_image is not None:
+        primitives = _decompose_from_edges(mask, source_image, largest)
+    else:
+        primitives = decompose_contour(largest)
+    
     result = classify_from_primitives(primitives, largest, mask.shape)
     
     area = cv2.contourArea(largest)
@@ -314,6 +326,47 @@ def classify_shape_rc(mask, knowledge=None):
     result['vertices'] = result.get('vertices', len(approx))
     
     return result
+
+
+def _decompose_from_edges(mask, source_image, mask_contour):
+    """Decompose shape by running Canny on the source image within the mask region.
+    
+    This finds the ACTUAL drawn strokes (lines, arcs) rather than the
+    filled mask contour — much more accurate for ruler-and-compass detection.
+    """
+    # Convert source to grayscale if needed
+    if len(source_image.shape) == 3:
+        gray = cv2.cvtColor(source_image, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = source_image
+    
+    # Expand mask slightly to catch edge pixels at the boundary
+    kernel = np.ones((5, 5), np.uint8)
+    expanded_mask = cv2.dilate(mask.astype(np.uint8), kernel, iterations=2)
+    
+    # Run Canny on the full image, then mask to this region
+    edges = cv2.Canny(gray, 50, 150)
+    masked_edges = cv2.bitwise_and(edges, edges, mask=expanded_mask)
+    
+    # Find contours in the edge image within this region
+    edge_contours, _ = cv2.findContours(masked_edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    
+    if not edge_contours:
+        # Fallback to mask contour decomposition
+        return decompose_contour(mask_contour)
+    
+    # Merge all edge contours into one set of primitives
+    all_primitives = []
+    for ec in edge_contours:
+        if cv2.arcLength(ec, False) < 15:  # skip tiny fragments
+            continue
+        prims = decompose_contour(ec)
+        all_primitives.extend(prims)
+    
+    if not all_primitives:
+        return decompose_contour(mask_contour)
+    
+    return all_primitives
 
 
 if __name__ == '__main__':
