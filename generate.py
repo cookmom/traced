@@ -710,7 +710,9 @@ def generate_from_optimized(optimized: dict, extraction: dict, knowledge: dict, 
             steps_js.append(f"""  {{name:'FINIAL {fi+1}',formula:'spire+crescent',dur:0.3,bbox:[{int(fin["cx"]-12)},{int(max(5,fin["top_y"]-5))},{int(fin["cx"]+12)},{int(fin["bot_y"]+5)}],draw:function(p){{brush.set('2H','#5a5248',{wt});var fRange={fin_range:.0f};brush.line({fin["cx"]:.0f},{fin["bot_y"]:.0f},{fin["cx"]:.0f},{fin["bot_y"]:.0f}-fRange*Math.min(1,p*2));if(p>0.5){{var cR=7,cPts=[];for(var i=0;i<=12;i++){{var a=-Math.PI/2+Math.PI*(i/12);cPts.push([{fin["cx"]:.0f}+3+cR*Math.cos(a),{fin_top_safe:.0f}+10+cR*Math.sin(a),0.4]);}}if(cPts.length>=2)brush.spline(cPts,0.3);}}return[{fin["cx"]:.0f},{fin_top_safe:.0f}];}}}},""")
         for ki, cor in enumerate(cons.get("cornices", [])):
             wt=cor.get("line_weight",0.8)
-            steps_js.append(f"""  {{name:'CORNICE',formula:'y={cor["y"]:.0f}',dur:0.2,bbox:[{int(cor["x1"])},{int(cor["y"]-3)},{int(cor["x2"])},{int(cor["y"]+3)}],draw:function(p){{brush.set('2H','#8a8278',{wt});brush.line({cor["x1"]:.0f},{cor["y"]:.0f},{cor["x1"]:.0f}+({cor["x2"]:.0f}-{cor["x1"]:.0f})*p,{cor["y"]:.0f});return[{cor["x2"]:.0f},{cor["y"]:.0f}];}}}},""")
+            x1s = f"({cor['x1']:.0f})" if cor['x1'] < 0 else f"{cor['x1']:.0f}"
+            x2s = f"({cor['x2']:.0f})" if cor['x2'] < 0 else f"{cor['x2']:.0f}"
+            steps_js.append(f"""  {{name:'CORNICE',formula:'y={cor["y"]:.0f}',dur:0.2,bbox:[{int(cor["x1"])},{int(cor["y"]-3)},{int(cor["x2"])},{int(cor["y"]+3)}],draw:function(p){{brush.set('2H','#8a8278',{wt});brush.line({x1s},{cor["y"]:.0f},{x1s}+({x2s}-{x1s})*p,{cor["y"]:.0f});return[{x2s},{cor["y"]:.0f}];}}}},""")
     
     # Wash steps
     wash_start = len(steps_js)
