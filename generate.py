@@ -36,17 +36,19 @@ PHI = (1 + math.sqrt(5)) / 2
 
 
 def compute_aspect_mapping(src_w, src_h):
-    """Compute mapping that preserves aspect ratio with letterboxing."""
+    """Compute mapping from source image to canvas.
+    If source is already 1080x1920 (preprocessed), returns identity mapping."""
+    if src_w == CANVAS_W and src_h == CANVAS_H:
+        return 1.0, 0.0, 0.0  # Identity — no mapping needed
+    
     src_aspect = src_w / src_h
     dst_aspect = CANVAS_W / CANVAS_H
     
     if src_aspect > dst_aspect:
-        # Source is wider — fit to width, letterbox top/bottom
         scale = CANVAS_W / src_w
         offset_x = 0
         offset_y = (CANVAS_H - src_h * scale) / 2
     else:
-        # Source is taller — fit to height, letterbox left/right
         scale = CANVAS_H / src_h
         offset_x = (CANVAS_W - src_w * scale) / 2
         offset_y = 0
@@ -55,7 +57,7 @@ def compute_aspect_mapping(src_w, src_h):
 
 
 def map_point(px, py, scale, offset_x, offset_y):
-    """Map source image coords to canvas coords with aspect preservation."""
+    """Map source image coords to canvas coords."""
     return [round(px * scale + offset_x, 1), round(py * scale + offset_y, 1)]
 
 
