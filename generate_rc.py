@@ -57,7 +57,7 @@ def generate_html(optimized, name="Building", ref_image_path=None):
 <style>
 *{{margin:0;padding:0}}
 body{{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}}
-#wrap{{position:relative;max-height:100vh;max-width:calc(100vh*{W}/{H});aspect-ratio:{W}/{H}}}
+#wrap{{position:relative;height:100vh;width:calc(100vh*{W}/{H})}}
 #ref-src{{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.5;filter:grayscale(100%);z-index:1}}
 canvas{{position:absolute;top:0;left:0;width:100%!important;height:100%!important;z-index:2}}
 </style>
