@@ -117,149 +117,136 @@ def primitives_from_extraction(extraction: dict, image_shape: tuple):
         rc_radius = shape_info.get('radius', None) if isinstance(shape_info, dict) else None
         rc_arc = shape_info.get('arc', None) if isinstance(shape_info, dict) else None
         
-        # Determine primitive type from shape classification
-        if shape in ('circle', 'ellipse'):
-            if rc_center and rc_radius:
-                c_cx, c_cy = rc_center
-                r = rc_radius
-            else:
-                c_cx, c_cy = cx, cy
-                r = max(bw, bh) / 2
+        # ============================================================
+        # PURE PRIMITIVES — use R&C classifier's decomposition directly
+        # No shape-specific logic. Just pass through what was detected.
+        # ============================================================
+        
+        # If R&C found a circle (center + radius), use it as a 360° arc
+        if rc_center and rc_radius:
             primitives.append({
                 'name': name,
                 'type': 'arc',
                 'params': {
-                    'cx': float(c_cx), 'cy': float(c_cy),
+                    'cx': float(rc_center[0]), 'cy': float(rc_center[1]),
+                    'radius': float(rc_radius),
+                    'start_angle': 0.0,
+                    'sweep': 2 * math.pi
+                },
+                'source_shape': shape
+            })
+            continue
+        
+        # If R&C found an arc (from arch detection), use it directly
+        if rc_arc:
+            primitives.append({
+                'name': f'{name}_arc',
+                'type': 'arc',
+                'params': {
+                    'cx': float(rc_arc['center'][0]),
+                    'cy': float(rc_arc['center'][1]),
+                    'radius': float(rc_arc['radius']),
+                    'start_angle': float(rc_arc['start_angle']),
+                    'sweep': float(rc_arc['sweep'])
+                },
+                'source_shape': shape,
+                'group': name
+            })
+        
+        # If R&C found lines (from primitives count), generate lines from bbox
+        n_lines = shape_info.get('primitives', {}).get('lines', 0) if isinstance(shape_info, dict) else 0
+        n_arcs_detected = shape_info.get('primitives', {}).get('arcs', 0) if isinstance(shape_info, dict) else 0
+        
+        if n_lines >= 3 and n_arcs_detected == 0:
+            # Pure line shape — generate lines from bbox edges
+            x0, y0 = bx, by
+            x1, y1 = bx + bw, by + bh
+            if n_lines == 4 and 0.80 < (bw/bh if bh > 0 else 1) < 1.20:
+                # Square/rectangle — 4 edges
+                for i, (lx1, ly1, lx2, ly2) in enumerate([
+                    (x0, y0, x1, y0), (x1, y0, x1, y1),
+                    (x1, y1, x0, y1), (x0, y1, x0, y0),
+                ]):
+                    primitives.append({
+                        'name': f'{name}_line_{i}',
+                        'type': 'line',
+                        'params': {
+                            'x1': float(lx1), 'y1': float(ly1),
+                            'x2': float(lx2), 'y2': float(ly2)
+                        },
+                        'source_shape': shape,
+                        'group': name
+                    })
+            elif n_lines >= 3:
+                # Rectangle (non-square)
+                for i, (lx1, ly1, lx2, ly2) in enumerate([
+                    (x0, y0, x1, y0), (x1, y0, x1, y1),
+                    (x1, y1, x0, y1), (x0, y1, x0, y0),
+                ]):
+                    primitives.append({
+                        'name': f'{name}_line_{i}',
+                        'type': 'line',
+                        'params': {
+                            'x1': float(lx1), 'y1': float(ly1),
+                            'x2': float(lx2), 'y2': float(ly2)
+                        },
+                        'source_shape': shape,
+                        'group': name
+                    })
+        elif n_lines >= 1 and rc_arc:
+            # Lines detected alongside an arc — add leg lines from bbox
+            # (the arc was already added above)
+            # Infer leg positions from bbox bottom
+            leg_y_bottom = by + bh
+            if rc_arc:
+                leg_x_left = rc_arc['center'][0] - rc_arc['radius']
+                leg_x_right = rc_arc['center'][0] + rc_arc['radius']
+                leg_y_top = rc_arc['center'][1]
+            else:
+                leg_x_left = bx
+                leg_x_right = bx + bw
+                leg_y_top = by + bh * 0.5
+            
+            primitives.append({
+                'name': f'{name}_leg_l', 'type': 'line',
+                'params': {'x1': float(leg_x_left), 'y1': float(leg_y_top),
+                           'x2': float(leg_x_left), 'y2': float(leg_y_bottom)},
+                'source_shape': shape, 'group': name
+            })
+            primitives.append({
+                'name': f'{name}_leg_r', 'type': 'line',
+                'params': {'x1': float(leg_x_right), 'y1': float(leg_y_top),
+                           'x2': float(leg_x_right), 'y2': float(leg_y_bottom)},
+                'source_shape': shape, 'group': name
+            })
+        elif n_arcs_detected > 0 and n_lines == 0:
+            # Arc-only shape — fit as arc from bbox
+            r = max(bw, bh) / 2
+            primitives.append({
+                'name': name,
+                'type': 'arc',
+                'params': {
+                    'cx': float(cx), 'cy': float(cy),
+                    'radius': float(r),
+                    'start_angle': 0.0,
+                    'sweep': 2 * math.pi  # will be optimized
+                },
+                'source_shape': shape
+            })
+        elif bw > 20 and bh > 20:
+            # Fallback — unknown shape, try as arc
+            r = max(bw, bh) / 2
+            primitives.append({
+                'name': name,
+                'type': 'arc',
+                'params': {
+                    'cx': float(cx), 'cy': float(cy),
                     'radius': float(r),
                     'start_angle': 0.0,
                     'sweep': 2 * math.pi
                 },
                 'source_shape': shape
             })
-        
-        elif shape in ('square', 'rectangle'):
-            # 4 lines
-            x0, y0 = bx, by
-            x1, y1 = bx + bw, by + bh
-            for i, (lx1, ly1, lx2, ly2) in enumerate([
-                (x0, y0, x1, y0),  # top
-                (x1, y0, x1, y1),  # right
-                (x1, y1, x0, y1),  # bottom
-                (x0, y1, x0, y0),  # left
-            ]):
-                primitives.append({
-                    'name': f'{name}_line_{i}',
-                    'type': 'line',
-                    'params': {
-                        'x1': float(lx1), 'y1': float(ly1),
-                        'x2': float(lx2), 'y2': float(ly2)
-                    },
-                    'source_shape': shape,
-                    'group': name
-                })
-        
-        elif 'arch' in shape:
-            # Use R&C arc data if available
-            if rc_arc:
-                a_cx = rc_arc['center'][0]
-                a_cy = rc_arc['center'][1]
-                a_r = rc_arc['radius']
-                a_start = rc_arc['start_angle']
-                a_sweep = rc_arc['sweep']
-            else:
-                hs = bw / 2
-                a_cx = cx
-                a_cy = by + bh * 0.7
-                a_r = hs
-                a_start = math.pi
-                a_sweep = -math.pi
-            
-            primitives.append({
-                'name': f'{name}_arc',
-                'type': 'arc',
-                'params': {
-                    'cx': float(a_cx), 'cy': float(a_cy),
-                    'radius': float(a_r),
-                    'start_angle': float(a_start),
-                    'sweep': float(a_sweep)
-                },
-                'source_shape': shape,
-                'group': name
-            })
-            # Left leg — use arc radius as half-span
-            leg_hs = a_r
-            leg_sy = a_cy  # springing point = arc center y
-            primitives.append({
-                'name': f'{name}_leg_l',
-                'type': 'line',
-                'params': {
-                    'x1': float(a_cx - leg_hs), 'y1': float(leg_sy),
-                    'x2': float(a_cx - leg_hs), 'y2': float(by + bh)
-                },
-                'source_shape': shape,
-                'group': name
-            })
-            # Right leg
-            primitives.append({
-                'name': f'{name}_leg_r',
-                'type': 'line',
-                'params': {
-                    'x1': float(a_cx + leg_hs), 'y1': float(leg_sy),
-                    'x2': float(a_cx + leg_hs), 'y2': float(by + bh)
-                },
-                'source_shape': shape,
-                'group': name
-            })
-        
-        elif shape == 'dome':
-            # Arc (top half)
-            r = max(bw, bh) / 2
-            primitives.append({
-                'name': name,
-                'type': 'arc',
-                'params': {
-                    'cx': float(cx), 'cy': float(cy + r * 0.3),
-                    'radius': float(r),
-                    'start_angle': math.pi,
-                    'sweep': -math.pi  # top semicircle
-                },
-                'source_shape': shape
-            })
-        
-        elif shape == 'triangle':
-            # 3 lines
-            x0, y0 = cx, by  # top
-            x1, y1 = bx, by + bh  # bottom-left
-            x2, y2 = bx + bw, by + bh  # bottom-right
-            for i, (lx1, ly1, lx2, ly2) in enumerate([
-                (x0, y0, x1, y1), (x1, y1, x2, y2), (x2, y2, x0, y0)
-            ]):
-                primitives.append({
-                    'name': f'{name}_line_{i}',
-                    'type': 'line',
-                    'params': {
-                        'x1': float(lx1), 'y1': float(ly1),
-                        'x2': float(lx2), 'y2': float(ly2)
-                    },
-                    'source_shape': shape,
-                    'group': name
-                })
-        
-        else:
-            # Unknown — try as a generic arc or skip
-            if bw > 20 and bh > 20:
-                r = max(bw, bh) / 2
-                primitives.append({
-                    'name': name,
-                    'type': 'arc',
-                    'params': {
-                        'cx': float(cx), 'cy': float(cy),
-                        'radius': float(r),
-                        'start_angle': 0.0,
-                        'sweep': 2 * math.pi
-                    },
-                    'source_shape': shape
-                })
     
     return primitives
 
