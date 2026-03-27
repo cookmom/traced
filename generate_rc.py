@@ -60,32 +60,77 @@ body{{background:#f2eada;overflow:hidden;display:flex;justify-content:center;ali
 #wrap{{position:relative;height:100vh;width:calc(100vh*{W}/{H})}}
 #ref-src{{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.5;filter:grayscale(100%);z-index:1}}
 canvas{{position:absolute;top:0;left:0;width:100%!important;height:100%!important;z-index:2}}
+#hud{{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;font-family:'SF Mono','Fira Code',monospace;overflow:hidden}}
+.track-box{{position:absolute;transition:opacity 0.3s,left 0.4s,top 0.4s,width 0.4s,height 0.4s;min-width:60px;min-height:60px}}
+.track-box::before,.track-box::after,.track-box .bl::before,.track-box .br::before{{content:'';position:absolute;width:24px;height:24px;border-color:#c0392b;border-style:solid;border-width:0}}
+.track-box::before{{top:-2px;left:-2px;border-top-width:2px;border-left-width:2px}}
+.track-box::after{{top:-2px;right:-2px;border-top-width:2px;border-right-width:2px}}
+.track-box .bl::before{{bottom:-2px;left:-2px;border-bottom-width:2px;border-left-width:2px;position:absolute}}
+.track-box .br::before{{bottom:-2px;right:-2px;border-bottom-width:2px;border-right-width:2px;position:absolute}}
+.hud-info{{position:absolute;bottom:100%;left:0;margin-bottom:12px;background:rgba(242,234,218,0.9);padding:6px 10px;border-radius:4px;white-space:nowrap}}
+.hud-label{{color:#c0392b;font-weight:700;font-size:11px;letter-spacing:0.5px}}
+.hud-formula{{color:#8a8278;font-size:10px;margin-top:2px}}
+.hud-coords{{color:#a09888;font-size:10px;margin-top:2px}}
+#pencil-dot{{position:absolute;width:14px;height:14px;pointer-events:none;z-index:20;display:none}}
+#pencil-dot .ch{{width:8px;height:8px;border:2px solid #c0392b;border-radius:50%;margin:1px}}
+#footer{{position:absolute;bottom:8px;left:0;width:100%;text-align:center;color:#a09888;font-family:'SF Mono',monospace;font-size:10px;z-index:10;pointer-events:none}}
 </style>
 </head><body>
 <div id="wrap">
 {ref_img_tag}
+<div id="hud"><div id="pencil-dot"><div class="ch"></div></div></div>
+<div id="footer">Traced R&C | {name}</div>
 </div>
 <script>
 var W={W},H={H},cx=W/2;
     {all_curves}
-var FPS=30;
+var FPS=30,_hs=1,trackBox=null,pencilDot=null;
 var STEPS=[
 {all_steps}
 ];
-var PAUSE_S=0.14;
+var PAUSE_S=0.2;
 var frameStarts=[],frameEnds=[],f2=0;
 for(var i=0;i<STEPS.length;i++){{frameStarts.push(Math.round(f2));f2+=STEPS[i].dur*FPS;frameEnds.push(Math.round(f2));if(i<STEPS.length-1)f2+=PAUSE_S*FPS;}}
-var totalAnimFrames=Math.round(f2);
-function setup(){{var c=createCanvas(W,H,WEBGL);pixelDensity(1);c.parent('wrap');brush.load();frameRate(FPS);}}
+var totalAnimFrames=Math.round(f2),lastHudStep=-1;
+
+function createTrackBox(step){{
+  var hud=document.getElementById('hud');if(trackBox)trackBox.remove();
+  var box=document.createElement('div');box.className='track-box';
+  var s=_hs,b=step.bbox,pad=10*s;
+  box.style.left=(b[0]*s-pad)+'px';box.style.top=(b[1]*s-pad)+'px';
+  box.style.width=((b[2]-b[0])*s+pad*2)+'px';box.style.height=((b[3]-b[1])*s+pad*2)+'px';
+  var bl=document.createElement('div');bl.className='bl';bl.style.cssText='position:absolute;bottom:0;left:0;width:100%;height:100%;pointer-events:none';box.appendChild(bl);
+  var br=document.createElement('div');br.className='br';br.style.cssText='position:absolute;bottom:0;right:0;width:100%;height:100%;pointer-events:none';box.appendChild(br);
+  var info=document.createElement('div');info.className='hud-info';
+  if(b[1]*s-pad<60){{info.style.bottom='auto';info.style.top='6px';}}
+  var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
+  var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
+  var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:\u2014 y:\u2014';info.appendChild(crd);
+  box.appendChild(info);hud.appendChild(box);trackBox=box;
+}}
+function updateDot(x,y){{
+  if(!pencilDot)pencilDot=document.getElementById('pencil-dot');
+  pencilDot.style.display='block';pencilDot.style.left=(x*_hs-7)+'px';pencilDot.style.top=(y*_hs-7)+'px';
+  var el=document.getElementById('live-coords');if(el)el.textContent='x:'+Math.round(x)+' y:'+Math.round(y);
+}}
+
+function setup(){{
+  var c=createCanvas(W,H,WEBGL);pixelDensity(1);c.parent('wrap');
+  _hs=document.getElementById('wrap').offsetWidth/W;
+  brush.load();frameRate(FPS);
+  window.addEventListener('resize',function(){{_hs=document.getElementById('wrap').offsetWidth/W;}});
+}}
 function draw(){{
-  translate(-width/2,-height/2);
-  clear();
+  translate(-width/2,-height/2);clear();
   var f3=Math.min(frameCount-1,totalAnimFrames-1);
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
   for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);
-  STEPS[activeStep].draw(prog);
-  if(f3>=totalAnimFrames-1)noLoop();
+  var tip=STEPS[activeStep].draw(prog);
+  if(activeStep!==lastHudStep){{createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}}
+  if(trackBox){{var b=STEPS[activeStep].bbox,s=_hs,pad=10*s;trackBox.style.left=(b[0]*s-pad)+'px';trackBox.style.top=(b[1]*s-pad)+'px';}}
+  if(tip)updateDot(tip[0],tip[1]);
+  if(f3>=totalAnimFrames-1){{noLoop();if(pencilDot)pencilDot.style.display='none';if(trackBox)setTimeout(function(){{trackBox.remove();trackBox=null;}},3000);}};
 }}
 </script>
 </body></html>"""

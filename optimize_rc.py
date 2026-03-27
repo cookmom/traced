@@ -122,6 +122,21 @@ def primitives_from_extraction(extraction: dict, image_shape: tuple):
         # No shape-specific logic. Just pass through what was detected.
         # ============================================================
         
+        # TRIANGLE: 3 lines from bbox (top-center → bottom-left → bottom-right → top)
+        if shape == 'triangle':
+            tx, ty = cx, by  # top center
+            bl_x, bl_y = bx, by + bh  # bottom left
+            br_x, br_y = bx + bw, by + bh  # bottom right
+            for i, (lx1,ly1,lx2,ly2) in enumerate([
+                (tx, ty, bl_x, bl_y), (bl_x, bl_y, br_x, br_y), (br_x, br_y, tx, ty)
+            ]):
+                primitives.append({
+                    'name': f'{name}_line_{i}', 'type': 'line',
+                    'params': {'x1':float(lx1),'y1':float(ly1),'x2':float(lx2),'y2':float(ly2)},
+                    'source_shape': shape, 'group': name
+                })
+            continue
+        
         # If R&C found a circle (center + radius), use it as a 360° arc
         if rc_center and rc_radius:
             primitives.append({

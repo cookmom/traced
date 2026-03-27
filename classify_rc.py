@@ -77,15 +77,13 @@ def decompose_contour(contour, min_arc_radius=5):
         # (points closest to the line segment p1→p2)
         fine_between = []
         for fp in fine:
-            d1 = np.linalg.norm(fp - p1)
-            d2 = np.linalg.norm(fp - p2)
-            if d1 < seg_len * 1.1 and d2 < seg_len * 1.1 and d1 > 3 and d2 > 3:
-                # Check perpendicular distance to line p1→p2
-                if seg_len > 0:
-                    t = np.dot(fp - p1, p2 - p1) / (seg_len * seg_len)
-                    if 0.05 < t < 0.95:
-                        proj = p1 + t * (p2 - p1)
-                        perp_dist = np.linalg.norm(fp - proj)
+            if seg_len > 0:
+                t = np.dot(fp - p1, p2 - p1) / (seg_len * seg_len)
+                if 0.05 < t < 0.95:
+                    proj = p1 + t * (p2 - p1)
+                    perp_dist = np.linalg.norm(fp - proj)
+                    # Only count points actually near this edge segment
+                    if perp_dist < seg_len * 0.5:
                         fine_between.append((fp, perp_dist))
         
         # Is this edge straight? Check max deviation of fine points
@@ -252,10 +250,10 @@ def classify_from_primitives(primitives, contour, mask_shape):
         result['confidence'] = 0.7
         return result
     
-    # TRIANGLE
-    if len(lines) == 3 and len(arcs) == 0 and solidity > 0.45:
+    # TRIANGLE: 2-3 lines, 0-1 arcs, low solidity (~0.5 for equilateral)
+    if 2 <= len(lines) <= 3 and len(arcs) <= 1 and 0.4 < solidity < 0.7:
         result['type'] = 'triangle'
-        result['confidence'] = 0.75
+        result['confidence'] = 0.7
         return result
     
     # POLYGON
@@ -265,51 +263,27 @@ def classify_from_primitives(primitives, contour, mask_shape):
         result['confidence'] = 0.65
         return result
     
-    # ARCH: arc(s) on top + line(s) as legs
+    # MIXED: arcs + lines — just report what was found
     if len(arcs) >= 1 and len(lines) >= 1:
-        top_arcs = [a for a in arcs if a['center'][1] < y + h * 0.6]
-        leg_lines = [l for l in lines if max(l['p1'][1], l['p2'][1]) > y + h * 0.4]
-        if top_arcs and leg_lines:
-            arc = max(top_arcs, key=lambda a: abs(a['sweep']))
-            sweep_deg = abs(math.degrees(arc['sweep']))
-            if sweep_deg > 60:
-                if sweep_deg > 200:
-                    result['type'] = 'horseshoe_arch'
-                elif aspect < 0.6:
-                    result['type'] = 'pointed_arch'
-                else:
-                    result['type'] = 'arch'
-                result['arc'] = arc
-                result['legs'] = len(leg_lines)
-                result['confidence'] = 0.65
-                return result
-    
-    # DOME: arc on top, no significant legs
-    if len(arcs) >= 1 and total_line_length < perimeter * 0.3:
-        result['type'] = 'dome'
-        result['confidence'] = 0.6
+        result['type'] = 'mixed'
+        result['confidence'] = 0.5
         return result
     
-    # COLUMN
-    if aspect < 0.3 and h > 2.5 * w:
-        result['type'] = 'column'
-        result['confidence'] = 0.65
+    # ARC-ONLY
+    if len(arcs) >= 1:
+        result['type'] = 'arc'
+        result['confidence'] = 0.5
         return result
     
-    # BAND
-    if aspect > 3.0 and solidity > 0.7:
-        result['type'] = 'horizontal_band'
-        result['confidence'] = 0.65
+    # LINE-ONLY (didn't match square/rect/triangle above)
+    if len(lines) >= 1:
+        result['type'] = 'lines'
+        result['confidence'] = 0.5
         return result
     
-    # FALLBACK
-    if solidity > 0.7:
-        result['type'] = 'wall'
-    elif solidity < 0.45:
-        result['type'] = 'openwork'
-    else:
-        result['type'] = 'unknown'
-    result['confidence'] = 0.4
+    # NOTHING DETECTED
+    result['type'] = 'unknown'
+    result['confidence'] = 0.3
     return result
 
 
