@@ -118,148 +118,47 @@ def primitives_from_extraction(extraction: dict, image_shape: tuple):
         rc_arc = shape_info.get('arc', None) if isinstance(shape_info, dict) else None
         
         # ============================================================
-        # PURE PRIMITIVES — use R&C classifier's decomposition directly
-        # No shape-specific logic. Just pass through what was detected.
+        # PASS THROUGH RAW PRIMITIVES from the R&C decomposer.
+        # No shape-specific manufacturing. What was detected is what we use.
         # ============================================================
         
-        # TRIANGLE: 3 lines from bbox (top-center → bottom-left → bottom-right → top)
-        if shape == 'triangle':
-            tx, ty = cx, by  # top center
-            bl_x, bl_y = bx, by + bh  # bottom left
-            br_x, br_y = bx + bw, by + bh  # bottom right
-            for i, (lx1,ly1,lx2,ly2) in enumerate([
-                (tx, ty, bl_x, bl_y), (bl_x, bl_y, br_x, br_y), (br_x, br_y, tx, ty)
-            ]):
+        raw_lines = shape_info.get('raw_lines', []) if isinstance(shape_info, dict) else []
+        raw_arcs = shape_info.get('raw_arcs', []) if isinstance(shape_info, dict) else []
+        
+        added = False
+        
+        # Add each detected line as a primitive
+        for i, rl in enumerate(raw_lines):
+            if rl.get('length', 0) > 10:  # skip tiny fragments
                 primitives.append({
                     'name': f'{name}_line_{i}', 'type': 'line',
-                    'params': {'x1':float(lx1),'y1':float(ly1),'x2':float(lx2),'y2':float(ly2)},
+                    'params': {'x1': float(rl['x1']), 'y1': float(rl['y1']),
+                               'x2': float(rl['x2']), 'y2': float(rl['y2'])},
                     'source_shape': shape, 'group': name
                 })
-            continue
+                added = True
         
-        # If R&C found a circle (center + radius), use it as a 360° arc
-        if rc_center and rc_radius:
-            primitives.append({
-                'name': name,
-                'type': 'arc',
-                'params': {
-                    'cx': float(rc_center[0]), 'cy': float(rc_center[1]),
-                    'radius': float(rc_radius),
-                    'start_angle': 0.0,
-                    'sweep': 2 * math.pi
-                },
-                'source_shape': shape
-            })
-            continue
+        # Add each detected arc as a primitive
+        for i, ra in enumerate(raw_arcs):
+            if ra.get('radius', 0) > 5:
+                primitives.append({
+                    'name': f'{name}_arc_{i}' if len(raw_arcs) > 1 else name,
+                    'type': 'arc',
+                    'params': {'cx': float(ra['cx']), 'cy': float(ra['cy']),
+                               'radius': float(ra['radius']),
+                               'start_angle': float(ra['start_angle']),
+                               'sweep': float(ra['sweep'])},
+                    'source_shape': shape, 'group': name
+                })
+                added = True
         
-        # If R&C found an arc (from arch detection), use it directly
-        if rc_arc:
-            primitives.append({
-                'name': f'{name}_arc',
-                'type': 'arc',
-                'params': {
-                    'cx': float(rc_arc['center'][0]),
-                    'cy': float(rc_arc['center'][1]),
-                    'radius': float(rc_arc['radius']),
-                    'start_angle': float(rc_arc['start_angle']),
-                    'sweep': float(rc_arc['sweep'])
-                },
-                'source_shape': shape,
-                'group': name
-            })
-        
-        # If R&C found lines (from primitives count), generate lines from bbox
-        n_lines = shape_info.get('primitives', {}).get('lines', 0) if isinstance(shape_info, dict) else 0
-        n_arcs_detected = shape_info.get('primitives', {}).get('arcs', 0) if isinstance(shape_info, dict) else 0
-        
-        if n_lines >= 3 and n_arcs_detected == 0:
-            # Pure line shape — generate lines from bbox edges
-            x0, y0 = bx, by
-            x1, y1 = bx + bw, by + bh
-            if n_lines == 4 and 0.80 < (bw/bh if bh > 0 else 1) < 1.20:
-                # Square/rectangle — 4 edges
-                for i, (lx1, ly1, lx2, ly2) in enumerate([
-                    (x0, y0, x1, y0), (x1, y0, x1, y1),
-                    (x1, y1, x0, y1), (x0, y1, x0, y0),
-                ]):
-                    primitives.append({
-                        'name': f'{name}_line_{i}',
-                        'type': 'line',
-                        'params': {
-                            'x1': float(lx1), 'y1': float(ly1),
-                            'x2': float(lx2), 'y2': float(ly2)
-                        },
-                        'source_shape': shape,
-                        'group': name
-                    })
-            elif n_lines >= 3:
-                # Rectangle (non-square)
-                for i, (lx1, ly1, lx2, ly2) in enumerate([
-                    (x0, y0, x1, y0), (x1, y0, x1, y1),
-                    (x1, y1, x0, y1), (x0, y1, x0, y0),
-                ]):
-                    primitives.append({
-                        'name': f'{name}_line_{i}',
-                        'type': 'line',
-                        'params': {
-                            'x1': float(lx1), 'y1': float(ly1),
-                            'x2': float(lx2), 'y2': float(ly2)
-                        },
-                        'source_shape': shape,
-                        'group': name
-                    })
-        elif n_lines >= 1 and rc_arc:
-            # Lines detected alongside an arc — add leg lines from bbox
-            # (the arc was already added above)
-            # Infer leg positions from bbox bottom
-            leg_y_bottom = by + bh
-            if rc_arc:
-                leg_x_left = rc_arc['center'][0] - rc_arc['radius']
-                leg_x_right = rc_arc['center'][0] + rc_arc['radius']
-                leg_y_top = rc_arc['center'][1]
-            else:
-                leg_x_left = bx
-                leg_x_right = bx + bw
-                leg_y_top = by + bh * 0.5
-            
-            primitives.append({
-                'name': f'{name}_leg_l', 'type': 'line',
-                'params': {'x1': float(leg_x_left), 'y1': float(leg_y_top),
-                           'x2': float(leg_x_left), 'y2': float(leg_y_bottom)},
-                'source_shape': shape, 'group': name
-            })
-            primitives.append({
-                'name': f'{name}_leg_r', 'type': 'line',
-                'params': {'x1': float(leg_x_right), 'y1': float(leg_y_top),
-                           'x2': float(leg_x_right), 'y2': float(leg_y_bottom)},
-                'source_shape': shape, 'group': name
-            })
-        elif n_arcs_detected > 0 and n_lines == 0:
-            # Arc-only shape — fit as arc from bbox
+        # Fallback: if decomposer found nothing, try circle fit from bbox
+        if not added and bw > 20 and bh > 20:
             r = max(bw, bh) / 2
             primitives.append({
-                'name': name,
-                'type': 'arc',
-                'params': {
-                    'cx': float(cx), 'cy': float(cy),
-                    'radius': float(r),
-                    'start_angle': 0.0,
-                    'sweep': 2 * math.pi  # will be optimized
-                },
-                'source_shape': shape
-            })
-        elif bw > 20 and bh > 20:
-            # Fallback — unknown shape, try as arc
-            r = max(bw, bh) / 2
-            primitives.append({
-                'name': name,
-                'type': 'arc',
-                'params': {
-                    'cx': float(cx), 'cy': float(cy),
-                    'radius': float(r),
-                    'start_angle': 0.0,
-                    'sweep': 2 * math.pi
-                },
+                'name': name, 'type': 'arc',
+                'params': {'cx': float(cx), 'cy': float(cy), 'radius': float(r),
+                           'start_angle': 0.0, 'sweep': 2 * math.pi},
                 'source_shape': shape
             })
     

@@ -199,8 +199,14 @@ def classify_from_primitives(primitives, contour, mask_shape):
     circularity = 4 * math.pi * area / (perimeter * perimeter) if perimeter > 0 else 0
     solidity = area / (w * h) if w * h > 0 else 0
     
+    # Store actual primitive geometry (not just counts)
+    raw_lines = [{'x1':l['p1'][0],'y1':l['p1'][1],'x2':l['p2'][0],'y2':l['p2'][1],'length':l['length']} for l in lines]
+    raw_arcs = [{'cx':a['center'][0],'cy':a['center'][1],'radius':a['radius'],'start_angle':a['start_angle'],'sweep':a['sweep']} for a in arcs]
+    
     result = {
         'primitives': {'lines': len(lines), 'arcs': len(arcs)},
+        'raw_lines': raw_lines,
+        'raw_arcs': raw_arcs,
         'total_line_length': total_line_length,
         'total_arc_sweep_deg': math.degrees(total_arc_sweep),
         'circularity': circularity,
