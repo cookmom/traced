@@ -289,30 +289,37 @@ def _cluster_edges(points, max_gap=4.0):
 
 
 def _fit_blob(points, min_line_length=30):
-    """Fit the best primitive to a connected blob."""
+    """Fit the best primitive to a connected blob.
+    
+    Parsimony: always try line first. A line is a simpler truth than a circle.
+    Only accept a circle if the line explains significantly fewer points.
+    """
     if len(points) < 10:
         return None
+    
     lr = fit_line_ransac(points)
     lc = np.sum(lr[2]) if lr else 0
+    
     cr = fit_circle_ransac(points, max_radius=1000)
     cc = np.sum(cr[4]) if cr else 0
-    min_pts = max(10, len(points) * 0.3)
     
-    line_wins = False
+    min_pts = max(10, len(points) * 0.25)
+    
+    # Line first (Aristotle: simpler explanation wins)
     if lr and lc >= min_pts:
         p1, p2, mask = lr
         if np.linalg.norm(p2-p1) >= min_line_length:
-            if cr is None or lc >= cc * 0.5:
-                line_wins = True
+            # Line wins UNLESS circle explains >2x as many points
+            # (a genuine circle will dominate; a square's diagonal won't)
+            if cr is None or cc < lc * 2.0:
+                return {
+                    'type': 'line',
+                    'params': {'x1':float(p1[0]),'y1':float(p1[1]),'x2':float(p2[0]),'y2':float(p2[1])},
+                    'n_inliers': int(lc), 'mask': mask
+                }
     
-    if line_wins:
-        p1, p2, mask = lr
-        return {
-            'type': 'line',
-            'params': {'x1':float(p1[0]),'y1':float(p1[1]),'x2':float(p2[0]),'y2':float(p2[1])},
-            'n_inliers': int(lc), 'mask': mask
-        }
-    elif cc >= min_pts:
+    # Circle only if it strongly dominates
+    if cc >= min_pts:
         center, radius, start, sweep, mask = cr
         return {
             'type': 'arc',
@@ -320,6 +327,7 @@ def _fit_blob(points, min_line_length=30):
                        'start_angle':float(start),'sweep':float(sweep)},
             'n_inliers': int(cc), 'mask': mask
         }
+    
     return None
 
 

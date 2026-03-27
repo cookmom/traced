@@ -46,21 +46,28 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             # p5.js arc(x, y, w, h, start, stop) in WEBGL mode
             if is_circ:
                 actual_sweep = 2 * math.pi
-                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},_lastP:0,draw:function(p){{
-      push();stroke(192,57,43);strokeWeight(2);noFill();
-      var s0={start:.4f}+{actual_sweep:.4f}*this._lastP;
-      var s1={start:.4f}+{actual_sweep:.4f}*p;
-      if(s1>s0+0.01)arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},s0,s1);
-      this._lastP=p;pop();
-      return [{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1)];
+                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
+      push();noFill();
+      stroke(192,57,43);strokeWeight(2);
+      arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},{start:.4f}+{actual_sweep:.4f}*p);
+      if(p<1){{var a={start:.4f}+{actual_sweep:.4f}*p;
+        stroke(192,57,43,60);strokeWeight(0.8);
+        line({cx:.1f},{cy:.1f},{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a));
+        fill(192,57,43);noStroke();ellipse({cx:.1f},{cy:.1f},5,5);}}
+      pop();
+      var a2={start:.4f}+{actual_sweep:.4f}*p;
+      return [{cx:.1f}+{r:.1f}*Math.cos(a2),{cy:.1f}+{r:.1f}*Math.sin(a2)];
     }}}}""")
             else:
-                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},_lastP:0,draw:function(p){{
-      push();stroke(192,57,43);strokeWeight(2);noFill();
-      var s0={start:.4f}+{sweep:.4f}*this._lastP;
+                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
+      push();noFill();
+      stroke(192,57,43);strokeWeight(2);
       var s1={start:.4f}+{sweep:.4f}*p;
-      if(Math.abs(s1-s0)>0.01)arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},Math.min(s0,s1),Math.max(s0,s1));
-      this._lastP=p;pop();
+      arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},s1);
+      if(p<1){{stroke(192,57,43,60);strokeWeight(0.8);
+        line({cx:.1f},{cy:.1f},{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1));
+        fill(192,57,43);noStroke();ellipse({cx:.1f},{cy:.1f},5,5);}}
+      pop();
       return [{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1)];
     }}}}""")
     
@@ -148,11 +155,11 @@ function setup(){{
 }}
 function draw(){{
   translate(-width/2,-height/2);
-  // No clear — strokes accumulate on transparent canvas over the grey source image
+  clear();// Clear each frame — redraw everything (needed for compass arm animation)
   var f3=Math.min(frameCount-1,totalAnimFrames-1);
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
-  // Draw newly completed steps (only on the frame they complete)
-  for(var i=0;i<activeStep;i++){{if(!STEPS[i]._done){{STEPS[i].draw(1);STEPS[i]._done=true;}}}}
+  // Redraw all completed steps
+  for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);
   var tip=STEPS[activeStep].draw(prog);
   if(activeStep!==lastHudStep){{createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}}
