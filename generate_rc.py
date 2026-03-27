@@ -36,21 +36,11 @@ def generate_html(optimized: dict, name: str = "Building", ref_image_path: str =
             source_draw_lines.append(f"brush.set('2H','#aaaaaa',3.0);brush.line({params['x1']:.0f},{params['y1']:.0f},{params['x2']:.0f},{params['y2']:.0f});")
     source_draw_js = "\n      ".join(source_draw_lines) if source_draw_lines else "// no source shapes"
     
-    # Native p5 drawing (non-brush, for persistent source overlay)
-    source_native_lines = []
-    for sp in source_prims:
-        params = sp['params']
-        if sp['type'] == 'arc':
-            sweep_deg = abs(math.degrees(params['sweep']))
-            if sweep_deg > 350:
-                source_native_lines.append(f"ellipse({params['cx']:.1f},{params['cy']:.1f},{params['radius']*2:.1f},{params['radius']*2:.1f});")
-            else:
-                start = params['start_angle']
-                end = start + params['sweep']
-                source_native_lines.append(f"arc({params['cx']:.1f},{params['cy']:.1f},{params['radius']*2:.1f},{params['radius']*2:.1f},{start:.4f},{end:.4f});")
-        elif sp['type'] == 'line':
-            source_native_lines.append(f"line({params['x1']:.0f},{params['y1']:.0f},{params['x2']:.0f},{params['y2']:.0f});")
-    source_native_js = "\n  ".join(source_native_lines) if source_native_lines else "// no source"
+    # Source overlay: draw ref image as textured plane in WEBGL
+    if ref_image_path and Path(ref_image_path).exists():
+        source_native_js = "if(_refImg){push();translate(W/2,H/2);noStroke();texture(_refImg);plane(W,H);pop();}"
+    else:
+        source_native_js = "// no source"
     
     # Build drawing steps
     steps_js = []

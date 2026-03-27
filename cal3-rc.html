@@ -64,7 +64,7 @@ function draw(){
   background(242,234,218);if(_refImg){push();tint(160,220);image(_refImg,0,0,W,H);pop();};
   // Draw source shapes in grey (every frame, using native p5 strokes)
   push();stroke(170);strokeWeight(4);noFill();
-  ellipse(540.7,958.5,389.3,389.3);
+  if(_refImg){push();translate(W/2,H/2);noStroke();texture(_refImg);plane(W,H);pop();}
   pop();
   for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);var tip=STEPS[activeStep].draw(prog);
