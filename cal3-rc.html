@@ -26,9 +26,9 @@
 var W=1080,H=1920,cx=W/2;
 
     var pts_circle_1 = [];
-    for(var j=0;j<=129;j++){var t=j/129;
-      var a=0.083499+6.779551*t;
-      pts_circle_1.push([540.0+194.5*Math.cos(a),959.6+194.5*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}
+    for(var j=0;j<=132;j++){var t=j/129;
+      var a=0.083499+6.283185*t;
+      pts_circle_1.push([540.0+194.5*Math.cos(a),959.6+194.5*Math.sin(a),1.0]);}
 
 var ANNOT_FONT=13,_dimLabels=[],_lastDimStep=-1;
 function clearDimLabels(){for(var i=0;i<_dimLabels.length;i++)_dimLabels[i].remove();_dimLabels=[];}

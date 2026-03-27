@@ -54,7 +54,18 @@ def generate_html(optimized: dict, name: str = "Building", ref_image_path: str =
             
             # Generate arc points
             var_name = f'pts_{p["name"].replace("-","_")}'
-            pts_js = f"""var {var_name} = [];
+            is_circle = sweep_deg > 350
+            if is_circle:
+                # For full circles: clamp to exactly 360°, add overlap to close
+                actual_sweep = 2 * math.pi * (1 if sweep > 0 else -1)
+                # Add 3 extra points past 360° so spline closes smoothly
+                extra = 3
+                pts_js = f"""var {var_name} = [];
+    for(var j=0;j<={n_pts + extra};j++){{var t=j/{n_pts};
+      var a={start:.6f}+{actual_sweep:.6f}*t;
+      {var_name}.push([{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a),1.0]);}}"""
+            else:
+                pts_js = f"""var {var_name} = [];
     for(var j=0;j<={n_pts};j++){{var t=j/{n_pts};
       var a={start:.6f}+{sweep:.6f}*t;
       {var_name}.push([{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a),0.3+0.7*Math.sin(Math.PI*t)]);}}"""
