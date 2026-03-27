@@ -34,7 +34,7 @@ def generate_html(optimized: dict, name: str = "Building", ref_image_path: str =
             
             dx = x2 - x1
             dy = y2 - y1
-            draw = f"""brush.set('2H','#5a5248',1.5);
+            draw = f"""brush.set('2H','#c0392b',2.0);
       brush.line({x1:.0f},{y1:.0f},{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p);
       return [{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p];"""
             
@@ -80,7 +80,7 @@ def generate_html(optimized: dict, name: str = "Building", ref_image_path: str =
             else:
                 formula = f'arc {sweep_deg:.0f}° R={r:.0f}'
             
-            draw = f"""brush.set('2H','#5a5248',1.5);
+            draw = f"""brush.set('2H','#c0392b',2.0);
       if({var_name}){{var n=Math.max(3,Math.round(p*{var_name}.length));
       var sub={var_name}.slice(0,n);if(sub.length>=2)brush.spline(sub,0.3);
       var tip=sub[sub.length-1];return [tip[0],tip[1]];}}"""
@@ -169,7 +169,7 @@ function draw(){{
   if(activeStep!==lastHudStep){{createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}}
   if(trackBox){{var _r3=window._canvasEl?window._canvasEl.getBoundingClientRect():{{left:0,top:0}},_s3=window._hudScale||1,_b3=STEPS[activeStep].bbox,_p3=12*_s3;trackBox.style.left=(Math.max(20,_b3[0])*_s3+_r3.left-_p3)+'px';trackBox.style.top=(Math.max(20,_b3[1])*_s3+_r3.top-_p3)+'px';}}
   if(tip)updatePencilDot(tip[0],tip[1]);
-  if(f3>=totalAnimFrames-1){{noLoop();if(pencilDot)pencilDot.style.display='none';if(trackBox)trackBox.remove();trackBox=null;setTimeout(function(){{clearDimLabels();}},6500);setTimeout(function(){{window.location.reload();}},7000);}}
+  if(f3>=totalAnimFrames-1){{noLoop();if(pencilDot)pencilDot.style.display='none';if(trackBox)trackBox.remove();trackBox=null;setTimeout(function(){{clearDimLabels();}},6500);}}
 }}
 </script>
 </body>
