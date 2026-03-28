@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ruler-and-Compass Generator — draws lines + arcs with p5.brush."""
+"""Ruler-and-Compass Generator — draws lines + arcs with native p5."""
 import argparse, json, math, base64
 from pathlib import Path
 
@@ -32,7 +32,10 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             dx, dy = x2-x1, y2-y1
             length = math.sqrt(dx*dx+dy*dy)
             bbox = f'[{int(min(x1,x2)-5)},{int(min(y1,y2)-5)},{int(max(x1,x2)+5)},{int(max(y1,y2)+5)}]'
-            steps_js.append(f"""  {{name:'{pname}',formula:'line L={length:.0f}',dur:{max(0.2,length/500):.2f},bbox:{bbox},draw:function(p){{brush.set('2H','#c0392b',2.0);brush.line({x1:.0f},{y1:.0f},{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p);return [{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p];}}}}""")
+            steps_js.append(f"""  {{name:'{pname}',formula:'line L={length:.0f}',dur:{max(0.2,length/500):.2f},bbox:{bbox},draw:function(p){{
+      push();stroke(192,57,43);strokeWeight(2);
+      line({x1:.0f},{y1:.0f},{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p);
+      pop();return [{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p];}}}}""")
         elif p['type'] == 'arc':
             cx,cy,r = params['cx'],params['cy'],params['radius']
             start,sweep = params['start_angle'],params['sweep']
@@ -86,7 +89,7 @@ def generate_html(optimized, name="Building", ref_image_path=None):
     html = f"""<!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html><html><head><meta charset="utf-8">
 <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<!-- ruler and compass only — no brush needed -->
 <style>
 *{{margin:0;padding:0}}
 body{{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}}
@@ -150,7 +153,7 @@ function updateDot(x,y){{
 function setup(){{
   var c=createCanvas(W,H,WEBGL);pixelDensity(1);c.parent('wrap');
   _hs=document.getElementById('wrap').offsetWidth/W;
-  brush.load();frameRate(FPS);
+  frameRate(FPS);
   window.addEventListener('resize',function(){{_hs=document.getElementById('wrap').offsetWidth/W;}});
 }}
 function draw(){{
