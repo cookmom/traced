@@ -54,7 +54,7 @@ var P=[
 {id:'ITLR',x:658,y:634,l:'Inner LegTop R',c:'i'}
 ];
 var IW=774,IH=1280,s=1,act=null,CX=387;
-var sym_map={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL',OTLL:'OTLR',OTLR:'OTLL',ITLL:'ITLR',ITLR:'ITLL'};
+var sym_map={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL',OTLL:'OTLR',OTLR:'OTLL',ITLL:'ITLR',ITLR:'ITLL',OPLL:'OPLR',OPLR:'OPLL',IPLL:'IPLR',IPLR:'IPLL'};
 // Curves: arcs defined by 3 points (from, through/apex, to)
 // Left outer arc: from OHL through OWL to OA
 // Right outer arc: from OA through OWR to OHR
@@ -65,6 +65,10 @@ var curves=[
   {pts:['OA','OWR','OHR'],c:'o',l:'Outer R arc'},
   {pts:['IHL','IWL','IA'],c:'i',l:'Inner L arc'},
   {pts:['IA','IWR','IHR'],c:'i',l:'Inner R arc'},
+  {pts:['OHL','OPLL','OTLL'],c:'o',l:'Outer pinch L'},
+  {pts:['OHR','OPLR','OTLR'],c:'o',l:'Outer pinch R'},
+  {pts:['IHL','IPLL','ITLL'],c:'i',l:'Inner pinch L'},
+  {pts:['IHR','IPLR','ITLR'],c:'i',l:'Inner pinch R'},
 ];
 var lines_def=[
   
