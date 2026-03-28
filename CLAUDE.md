@@ -240,3 +240,11 @@ Screenshots save to `~/.dev-browser/tmp/` — copy to workspace for messaging.
 3. **Karpathy**: gradient descent optimizes points against source edges
 4. **dev-browser**: verify every change visually before sending
 5. **Skill update**: document every lesson, every tool usage pattern, every architecture decision
+
+### Lesson 20: Gradient descent needs SIDE constraints
+Minimizing chamfer to nearest edge can find the WRONG edge (inside vs outside of an arch band).
+When optimizing arc positions, constrain the search:
+- Pin the arc's bow direction (midpoint offset sign must not flip)
+- Or: only match edges that are on the expected side of the arc
+- Or: use the signed distance (positive = correct side, negative = wrong side)
+Never let the optimizer flip an arc's curvature direction just because a closer edge exists on the other side.
