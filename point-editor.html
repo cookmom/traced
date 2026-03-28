@@ -56,13 +56,9 @@ var P=[
 {id:'O.pinch.R',x:744,y:650,l:'Outer PinchLow R',c:'o'},
 {id:'I.pinch.L',x:75,y:648,l:'Inner PinchLow L',c:'i'},
 {id:'I.pinch.R',x:699,y:648,l:'Inner PinchLow R',c:'i'},
-{id:'O.trans.L',x:52,y:670,l:'Outer Trans L',c:'o'},
-{id:'O.trans.R',x:722,y:670,l:'Outer Trans R',c:'o'},
-{id:'I.trans.L',x:97,y:658,l:'Inner Trans L',c:'i'},
-{id:'I.trans.R',x:677,y:658,l:'Inner Trans R',c:'i'}
 ];
 var IW=774,IH=1280,s=1,act=null,CX=387;
-var sym_map={OHL:'O.hs.R',OHR:'O.hs.L',OWL:'O.wide.R',OWR:'O.wide.L',IHL:'I.hs.R',IHR:'I.hs.L',IWL:'I.wide.R',IWR:'I.wide.L',OLL:'O.leg.R',OLR:'O.leg.L',ILL:'I.leg.R',ILR:'I.leg.L',OTLL:'O.legTop.R',OTLR:'O.legTop.L',ITLL:'I.legTop.R',ITLR:'I.legTop.L',OPLL:'O.pinch.R',OPLR:'O.pinch.L',IPLL:'I.pinch.R',IPLR:'I.pinch.L',OTRL:'O.trans.R',OTRR:'O.trans.L',ITRL:'I.trans.R',ITRR:'I.trans.L'};
+var sym_map={OHL:'O.hs.R',OHR:'O.hs.L',OWL:'O.wide.R',OWR:'O.wide.L',IHL:'I.hs.R',IHR:'I.hs.L',IWL:'I.wide.R',IWR:'I.wide.L',OLL:'O.leg.R',OLR:'O.leg.L',ILL:'I.leg.R',ILR:'I.leg.L',OTLL:'O.legTop.R',OTLR:'O.legTop.L',ITLL:'I.legTop.R',ITLR:'I.legTop.L',OPLL:'O.pinch.R',OPLR:'O.pinch.L',IPLL:'I.pinch.R',IPLR:'I.pinch.L',OTRL:'O.legTop.R',OTRR:'O.legTop.L',ITRL:'I.legTop.R',ITRR:'I.legTop.L'};
 // Curves: arcs defined by 3 points (from, through/apex, to)
 // Left outer arc: from OHL through OWL to OA
 // Right outer arc: from OA through OWR to OHR
@@ -73,14 +69,14 @@ var curves=[
   {pts:['O.apex','O.wide.R','O.hs.R'],c:'o',l:'Outer R arc'},
   {pts:['I.hs.L','I.wide.L','I.apex'],c:'i',l:'Inner L arc'},
   {pts:['I.apex','I.wide.R','I.hs.R'],c:'i',l:'Inner R arc'},
-  {pts:['O.hs.L','O.pinch.L','O.trans.L'],c:'o',l:'Outer pinch L'},
-  {pts:['O.hs.R','O.pinch.R','O.trans.R'],c:'o',l:'Outer pinch R'},
-  {pts:['I.hs.L','I.pinch.L','I.trans.L'],c:'i',l:'Inner pinch L'},
-  {pts:['I.hs.R','I.pinch.R','I.trans.R'],c:'i',l:'Inner pinch R'},
+  {pts:['O.hs.L','O.pinch.L','O.legTop.L'],c:'o',l:'Outer pinch L'},
+  {pts:['O.hs.R','O.pinch.R','O.legTop.R'],c:'o',l:'Outer pinch R'},
+  {pts:['I.hs.L','I.pinch.L','I.legTop.L'],c:'i',l:'Inner pinch L'},
+  {pts:['I.hs.R','I.pinch.R','I.legTop.R'],c:'i',l:'Inner pinch R'},
 ];
 var lines_def=[
   
-  {a:'O.trans.L',b:'O.legTop.L',c:'o'},{a:'O.trans.R',b:'O.legTop.R',c:'o'},{a:'I.trans.L',b:'I.legTop.L',c:'i'},{a:'I.trans.R',b:'I.legTop.R',c:'i'},{a:'O.legTop.L',b:'O.leg.L',c:'o'},{a:'O.legTop.R',b:'O.leg.R',c:'o'},{a:'I.legTop.L',b:'I.leg.L',c:'i'},{a:'I.legTop.R',b:'I.leg.R',c:'i'},
+  {a:'O.legTop.L',b:'O.legTop.L',c:'o'},{a:'O.legTop.R',b:'O.legTop.R',c:'o'},{a:'I.legTop.L',b:'I.legTop.L',c:'i'},{a:'I.legTop.R',b:'I.legTop.R',c:'i'},{a:'O.legTop.L',b:'O.leg.L',c:'o'},{a:'O.legTop.R',b:'O.leg.R',c:'o'},{a:'I.legTop.L',b:'I.leg.L',c:'i'},{a:'I.legTop.R',b:'I.leg.R',c:'i'},
   {a:'O.leg.L',b:'O.leg.R',c:'o'},{a:'I.leg.L',b:'I.leg.R',c:'i'},
 ];
 var meas=[
