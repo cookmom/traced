@@ -195,3 +195,31 @@ The UI panel was 220px wide and covered the right 28% of the 774px image.
 Every "broken right arc" for the last 6 hours was actually correct — just hidden.
 ALWAYS close/hide UI overlays before evaluating the render.
 Use dev-browser to programmatically hide panels before screenshots.
+
+### dev-browser Superpowers (Unlocked 2026-03-28)
+1. **See any URL instantly** — screenshot + DOM read, no deploy wait
+2. **Interact with pages** — click, fill, read values. Use the point editor to place points myself
+3. **Test locally** — `python3 -m http.server 7777` + dev-browser, no GitHub push needed
+4. **Playwright scripts** — full browser automation, evaluate JS in page context
+5. **Iterate fast** — generate → serve → screenshot → check → fix → repeat
+
+**Key workflow**: Always hide UI panels before screenshots. Use `page.evaluate()` to read computed values (arc coords, point positions) directly from the page.
+
+**Usage pattern**:
+```
+cat > /tmp/script.js << 'JS'
+const page = await browser.newPage();
+await page.setViewportSize({width:W, height:H});
+await page.goto('http://localhost:7777/file.html');
+await new Promise(r => setTimeout(r, 3000));
+// Hide panels
+await page.evaluate(() => document.getElementById('panel').style.display='none');
+const buf = await page.screenshot();
+await saveScreenshot(buf, 'check.png');
+// Read values
+const data = await page.evaluate(() => someGlobal);
+console.log(JSON.stringify(data));
+JS
+GALLIUM_DRIVER=d3d12 MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA dev-browser --headless run /tmp/script.js
+```
+Screenshots save to `~/.dev-browser/tmp/` — copy to workspace for messaging.
