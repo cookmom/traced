@@ -26,7 +26,7 @@ button{margin-top:3px;padding:5px;color:#fff;border:none;border-radius:4px;curso
 <div id="coords"></div>
 <div id="measures"></div>
 <label><input type="checkbox" id="sym" checked> Symmetric L↔R</label>
-<button id="export" onclick="doExport()">📋 Copy JSON</button>
+<button id="export" onclick="doExport()" style="background:#27ae60">💾 Save + Copy JSON</button>
 <button id="add" onclick="doAdd()">+ Add</button>
 <div id="json-out"></div>
 </div>
@@ -190,8 +190,22 @@ document.getElementById('wrap').addEventListener('click',function(e){
 });
 
 function doExport(){var o={};P.forEach(function(p){o[p.id]={x:p.x,y:p.y,label:p.l};});
-  var j=JSON.stringify(o,null,2);navigator.clipboard.writeText(j).then(function(){document.getElementById('json-out').textContent='✅ Copied!\n'+j;}).catch(function(){document.getElementById('json-out').textContent=j;});}
+  var j=JSON.stringify(o,null,2);
+  // Save to URL hash for easy sharing
+  var compact=JSON.stringify(P.map(function(p){return{id:p.id,x:p.x,y:p.y};}));
+  window.location.hash=btoa(compact);
+  navigator.clipboard.writeText(j).then(function(){document.getElementById('json-out').textContent='✅ Copied + saved to URL!\n'+j;}).catch(function(){document.getElementById('json-out').textContent='Saved to URL\n'+j;});}
 function doAdd(){var id=prompt('ID:');if(!id)return;var l=prompt('Label:')||id;var c=prompt('o/i?')||'o';P.push({id:id,x:Math.round(IW/2),y:Math.round(IH/2),l:l,c:c});act=id;render();}
+// Load saved points from URL hash
+if(window.location.hash.length>1){
+  try{
+    var saved=JSON.parse(atob(window.location.hash.slice(1)));
+    saved.forEach(function(sp){
+      var p=fp(sp.id);
+      if(p){p.x=sp.x;p.y=sp.y;}
+    });
+  }catch(e){console.log('hash parse error',e);}
+}
 document.getElementById('src').onload=render;
 window.addEventListener('resize',render);
 
