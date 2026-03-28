@@ -26,7 +26,7 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             length = math.sqrt(dx*dx+dy*dy)
             bbox = f'[{int(min(x1,x2)-5)},{int(min(y1,y2)-5)},{int(max(x1,x2)+5)},{int(max(y1,y2)+5)}]'
             steps_js.append(f"""  {{name:'{pname}',formula:'line L={length:.0f}',dur:{max(0.3,length/400):.2f},bbox:{bbox},draw:function(p){{
-      stroke(192,57,43);strokeWeight(2);
+      stroke(192,57,43);strokeWeight(3);
       line({x1:.0f},{y1:.0f},{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p);
       return [{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p];}}}}""")
         elif p['type'] == 'arc':
@@ -40,7 +40,7 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             d = r*2
             actual_sweep = 2*math.pi*(1 if sweep>0 else -1) if is_circ else sweep
             steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
-      noFill();stroke(192,57,43);strokeWeight(2);
+      noFill();stroke(192,57,43);strokeWeight(3);
       var s1={start:.4f}+{actual_sweep:.4f}*p;
       arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},s1);
       if(p<1){{stroke(192,57,43,60);strokeWeight(0.8);
