@@ -91,19 +91,33 @@ def fit_line_ransac(points, n_iter=500, threshold=2.0):
     # Refit line to all inliers
     inlier_pts = points[best_inliers]
     
-    # Project inliers onto the line direction to find endpoints
+    # PCA for line direction
     mean = inlier_pts.mean(axis=0)
     centered = inlier_pts - mean
-    
-    # PCA to find line direction
     cov = centered.T @ centered
     eigenvalues, eigenvectors = np.linalg.eigh(cov)
-    direction = eigenvectors[:, 1]  # largest eigenvalue
+    direction = eigenvectors[:, 1]
     
-    # Project to find extent — use 2nd and 98th percentile to trim outliers
+    # Project inliers onto the line direction
     projections = centered @ direction
-    t_min = np.percentile(projections, 2)
-    t_max = np.percentile(projections, 98)
+    sorted_proj = np.sort(projections)
+    
+    # Find the longest continuous dense run (gap < 3px between consecutive points)
+    gaps = np.diff(sorted_proj)
+    # Split at large gaps (>3px = break in the stroke)
+    break_threshold = 3.0
+    segments = []
+    seg_start = 0
+    for i, g in enumerate(gaps):
+        if g > break_threshold:
+            segments.append((seg_start, i + 1))
+            seg_start = i + 1
+    segments.append((seg_start, len(sorted_proj)))
+    
+    # Keep the longest segment
+    longest = max(segments, key=lambda s: s[1] - s[0])
+    t_min = sorted_proj[longest[0]]
+    t_max = sorted_proj[longest[1] - 1]
     
     p1 = mean + direction * t_min
     p2 = mean + direction * t_max
