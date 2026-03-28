@@ -377,6 +377,52 @@ def detect_primitives(edge_points, image_shape, min_line_length=30):
             remaining = remaining[~result['mask']]
         unexplained += len(remaining)
     
+    # Post-filter: remove tiny primitives (noise at junctions)
+    filtered = []
+    for p in primitives:
+        if p['type'] == 'arc' and p['n_inliers'] < 30:
+            unexplained += p['n_inliers']
+            continue
+        if p['type'] == 'line' and p['n_inliers'] < 15:
+            unexplained += p['n_inliers']
+            continue
+        filtered.append(p)
+    if len(filtered) < len(primitives):
+        print(f"  Filtered: {len(primitives)} → {len(filtered)} ({len(primitives)-len(filtered)} tiny primitives removed)")
+    primitives = filtered
+    
+    # Snap nearby endpoints: if a line endpoint is within 15px of an arc endpoint, snap them together
+    for i, p in enumerate(primitives):
+        if p['type'] != 'line':
+            continue
+        lp = p['params']
+        for ep_key in [('x1','y1'), ('x2','y2')]:
+            lx, ly = lp[ep_key[0]], lp[ep_key[1]]
+            best_dist = 15.0
+            best_snap = None
+            for j, q in enumerate(primitives):
+                if i == j or q['type'] != 'arc':
+                    continue
+                qp = q['params']
+                import math as m
+                # Arc start point
+                sx = qp['cx'] + qp['radius'] * m.cos(qp['start_angle'])
+                sy = qp['cy'] + qp['radius'] * m.sin(qp['start_angle'])
+                d = m.sqrt((lx-sx)**2 + (ly-sy)**2)
+                if d < best_dist:
+                    best_dist = d
+                    best_snap = (sx, sy)
+                # Arc end point
+                ex = qp['cx'] + qp['radius'] * m.cos(qp['start_angle'] + qp['sweep'])
+                ey = qp['cy'] + qp['radius'] * m.sin(qp['start_angle'] + qp['sweep'])
+                d = m.sqrt((lx-ex)**2 + (ly-ey)**2)
+                if d < best_dist:
+                    best_dist = d
+                    best_snap = (ex, ey)
+            if best_snap:
+                lp[ep_key[0]] = best_snap[0]
+                lp[ep_key[1]] = best_snap[1]
+    
     return primitives, unexplained
 
 
