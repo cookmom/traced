@@ -18,60 +18,48 @@ canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important
 var W=774, H=1280;
 
 // Islamic geometric pattern: 8-fold star and cross
-function drawStar8(cx, cy, r, ctx) {
-    // 8-pointed star from two overlapping squares
-    ctx.beginPath();
+function drawStar8(cx, cy, r) {
+    beginShape();
     for(var i=0; i<8; i++) {
         var a = i * Math.PI/4 - Math.PI/8;
-        var outerR = r;
-        var innerR = r * 0.38;
-        var ax = cx + outerR * Math.cos(a);
-        var ay = cy + outerR * Math.sin(a);
+        vertex(cx + r * Math.cos(a), cy + r * Math.sin(a));
         var midA = a + Math.PI/8;
-        var mx = cx + innerR * Math.cos(midA);
-        var my = cy + innerR * Math.sin(midA);
-        if(i===0) ctx.moveTo(ax, ay);
-        else ctx.lineTo(ax, ay);
-        ctx.lineTo(mx, my);
+        vertex(cx + r*0.38 * Math.cos(midA), cy + r*0.38 * Math.sin(midA));
     }
-    ctx.closePath();
-    ctx.stroke();
+    endShape(CLOSE);
 }
 
 // Rosette pattern
-function drawRosette(cx, cy, r, n, ctx) {
+function drawRosette(cx, cy, r, n) {
     for(var i=0; i<n; i++) {
         var a1 = i * 2*Math.PI/n;
         var a2 = (i+1) * 2*Math.PI/n;
-        // Petal arc
         var mx = cx + r*0.7*Math.cos((a1+a2)/2);
         var my = cy + r*0.7*Math.sin((a1+a2)/2);
-        ctx.beginPath();
-        ctx.moveTo(cx + r*0.3*Math.cos(a1), cy + r*0.3*Math.sin(a1));
-        ctx.quadraticCurveTo(mx, my, cx + r*0.3*Math.cos(a2), cy + r*0.3*Math.sin(a2));
-        ctx.stroke();
+        beginShape();
+        vertex(cx + r*0.3*Math.cos(a1), cy + r*0.3*Math.sin(a1));
+        quadraticVertex(mx, my, cx + r*0.3*Math.cos(a2), cy + r*0.3*Math.sin(a2));
+        endShape();
     }
-    // Inner circle
-    ctx.beginPath();
-    ctx.arc(cx, cy, r*0.3, 0, Math.PI*2);
-    ctx.stroke();
+    ellipse(cx, cy, r*0.6, r*0.6);
 }
 
 // Fill a rectangular region with star-and-cross pattern
-function fillWithStarPattern(x, y, w, h, tileSize, ctx) {
-    ctx.strokeStyle = 'rgba(192,57,43,0.7)';
-    ctx.lineWidth = 0.8;
+function fillWithStarPattern(x, y, w, h, tileSize) {
+    push();
+    stroke(192,57,43,180);strokeWeight(0.8);noFill();
     var cols = Math.ceil(w / tileSize) + 1;
     var rows = Math.ceil(h / tileSize) + 1;
     for(var row=0; row<rows; row++) {
         for(var col=0; col<cols; col++) {
-            var cx = x + col * tileSize;
-            var cy = y + row * tileSize;
-            if(cx > x-tileSize && cx < x+w+tileSize && cy > y-tileSize && cy < y+h+tileSize) {
-                drawStar8(cx, cy, tileSize*0.45, ctx);
+            var ccx = x + col * tileSize;
+            var ccy = y + row * tileSize;
+            if(ccx > x-tileSize && ccx < x+w+tileSize && ccy > y-tileSize && ccy < y+h+tileSize) {
+                drawStar8(ccx, ccy, tileSize*0.45);
             }
         }
     }
+    pop();
 }
 
 // Fill arch zone with pattern (variable width per row)
@@ -103,7 +91,7 @@ function draw() {
     
     
     
-    var ctx = drawingContext;
+    
     
     // === STRUCTURAL DRAWING (red, heavier) ===
     stroke(192,57,43); strokeWeight(3); noFill();
@@ -219,8 +207,8 @@ function draw() {
     // Arch zone pattern (fills between inner and outer arch)
     // Use the inner arch circle to determine width at each y
     if(cIL) {
-        ctx.strokeStyle = 'rgba(192,57,43,0.5)';
-        ctx.lineWidth = 0.5;
+        stroke(192,57,43,128);
+        strokeWeight(0.5);
         for(var y=130; y<650; y+=25) {
             // Inner arch width at this y
             var dyI = y - cIL.cy;
@@ -234,7 +222,7 @@ function draw() {
                     var cols = Math.floor(rowW / 25);
                     var off = xL + (rowW - cols*25)/2;
                     for(var col=0; col<cols; col++) {
-                        drawRosette(off + col*25 + 12.5, y + 12.5, 10, 8, ctx);
+                        drawRosette(off + col*25 + 12.5, y + 12.5, 10, 8);
                     }
                 }
             }
