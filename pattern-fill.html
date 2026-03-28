@@ -1,0 +1,260 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traced — Islamic Pattern Fill</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}
+#wrap{position:relative;height:100vh;width:calc(100vh*774/1280)}
+#ref-src{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.3;filter:grayscale(100%);z-index:1}
+canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important;z-index:2}
+</style>
+</head><body>
+<div id="wrap">
+<img id="ref-src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'">
+</div>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<script>
+var W=774, H=1280;
+
+// Islamic geometric pattern: 8-fold star and cross
+function drawStar8(cx, cy, r, ctx) {
+    // 8-pointed star from two overlapping squares
+    ctx.beginPath();
+    for(var i=0; i<8; i++) {
+        var a = i * Math.PI/4 - Math.PI/8;
+        var outerR = r;
+        var innerR = r * 0.38;
+        var ax = cx + outerR * Math.cos(a);
+        var ay = cy + outerR * Math.sin(a);
+        var midA = a + Math.PI/8;
+        var mx = cx + innerR * Math.cos(midA);
+        var my = cy + innerR * Math.sin(midA);
+        if(i===0) ctx.moveTo(ax, ay);
+        else ctx.lineTo(ax, ay);
+        ctx.lineTo(mx, my);
+    }
+    ctx.closePath();
+    ctx.stroke();
+}
+
+// Rosette pattern
+function drawRosette(cx, cy, r, n, ctx) {
+    for(var i=0; i<n; i++) {
+        var a1 = i * 2*Math.PI/n;
+        var a2 = (i+1) * 2*Math.PI/n;
+        // Petal arc
+        var mx = cx + r*0.7*Math.cos((a1+a2)/2);
+        var my = cy + r*0.7*Math.sin((a1+a2)/2);
+        ctx.beginPath();
+        ctx.moveTo(cx + r*0.3*Math.cos(a1), cy + r*0.3*Math.sin(a1));
+        ctx.quadraticCurveTo(mx, my, cx + r*0.3*Math.cos(a2), cy + r*0.3*Math.sin(a2));
+        ctx.stroke();
+    }
+    // Inner circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, r*0.3, 0, Math.PI*2);
+    ctx.stroke();
+}
+
+// Fill a rectangular region with star-and-cross pattern
+function fillWithStarPattern(x, y, w, h, tileSize, ctx) {
+    ctx.strokeStyle = 'rgba(192,57,43,0.4)';
+    ctx.lineWidth = 0.8;
+    var cols = Math.ceil(w / tileSize) + 1;
+    var rows = Math.ceil(h / tileSize) + 1;
+    for(var row=0; row<rows; row++) {
+        for(var col=0; col<cols; col++) {
+            var cx = x + col * tileSize;
+            var cy = y + row * tileSize;
+            if(cx > x-tileSize && cx < x+w+tileSize && cy > y-tileSize && cy < y+h+tileSize) {
+                drawStar8(cx, cy, tileSize*0.45, ctx);
+            }
+        }
+    }
+}
+
+// Fill arch zone with pattern (variable width per row)
+function fillArchWithPattern(archFunc, yStart, yEnd, tileSize, ctx) {
+    ctx.strokeStyle = 'rgba(192,57,43,0.3)';
+    ctx.lineWidth = 0.6;
+    for(var y=yStart; y<yEnd; y+=tileSize) {
+        var bounds = archFunc(y);
+        if(!bounds) continue;
+        var xL = bounds[0], xR = bounds[1];
+        var rowW = xR - xL;
+        var cols = Math.floor(rowW / tileSize);
+        var offsetX = xL + (rowW - cols*tileSize)/2;
+        for(var col=0; col<cols; col++) {
+            drawStar8(offsetX + col*tileSize + tileSize/2, y + tileSize/2, tileSize*0.4, ctx);
+        }
+    }
+}
+
+function setup() {
+    var c = createCanvas(W, H, WEBGL);
+    pixelDensity(1);
+    c.parent('wrap');
+    brush.load();
+    noLoop();
+}
+
+function draw() {
+    translate(-W/2, -H/2);
+    clear();
+    
+    var ctx = drawingContext;
+    
+    // === STRUCTURAL DRAWING (red, heavier) ===
+    stroke(192,57,43); strokeWeight(3); noFill();
+    
+    // Arch arcs (using vertex curves like generate_rc.py)
+    // Outer arch
+    var arcs = [
+        // center, r, startAngle, sweep — from our optimized points
+        {cx:446,cy:474,r:401,sa:-1.429,sw:1.804,label:'outerL'},
+        {cx:328,cy:474,r:401,sa:-1.429+1.804,sw:-1.804,label:'outerR'}, // mirror
+        {cx:464,cy:490,r:377,sa:-1.396,sw:1.746,label:'innerL'},
+        {cx:310,cy:490,r:377,sa:-1.396+1.746,sw:-1.746,label:'innerR'},
+    ];
+    
+    // Actually, use the fitCircle approach from our points
+    var pts = {
+        'O.apex':[387,78],'O.hs.L':[73,621],'O.hs.R':[701,621],
+        'O.wide.L':[46,475],'O.wide.R':[728,475],
+        'I.apex':[387,122],'I.hs.L':[118,635],'I.hs.R':[656,635],
+        'I.wide.L':[89,476],'I.wide.R':[685,476],
+        'O.pinch.L':[55,671],'O.pinch.R':[719,671],
+        'I.pinch.L':[102,656],'I.pinch.R':[672,656],
+        'O.legTop.L':[43,670],'O.legTop.R':[731,670],
+        'I.legTop.L':[88,658],'I.legTop.R':[686,658],
+    };
+    
+    function fitCircle3(p1,p2,p3){
+        var ax=p1[0],ay=p1[1],bx=p2[0],by=p2[1],cx=p3[0],cy=p3[1];
+        var D=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
+        if(Math.abs(D)<0.01)return null;
+        var ux=((ax*ax+ay*ay)*(by-cy)+(bx*bx+by*by)*(cy-ay)+(cx*cx+cy*cy)*(ay-by))/D;
+        var uy=((ax*ax+ay*ay)*(cx-bx)+(bx*bx+by*by)*(ax-cx)+(cx*cx+cy*cy)*(bx-ax))/D;
+        return{cx:ux,cy:uy,r:Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy))};
+    }
+    
+    function drawArc3(p1,p2,p3,sw){
+        var c=fitCircle3(p1,p2,p3);if(!c)return c;
+        var a1=Math.atan2(p1[1]-c.cy,p1[0]-c.cx);
+        var a2=Math.atan2(p2[1]-c.cy,p2[0]-c.cx);
+        var a3=Math.atan2(p3[1]-c.cy,p3[0]-c.cx);
+        var d12=a2-a1,d13=a3-a1;
+        while(d12>Math.PI)d12-=2*Math.PI;while(d12<-Math.PI)d12+=2*Math.PI;
+        while(d13>Math.PI)d13-=2*Math.PI;while(d13<-Math.PI)d13+=2*Math.PI;
+        var sweep=d13;
+        if(d12*d13<0||(Math.abs(d12)>Math.abs(d13)))sweep=d13>0?d13-2*Math.PI:d13+2*Math.PI;
+        beginShape();
+        for(var i=0;i<=60;i++){var t=i/60;var a=a1+sweep*t;
+            vertex(c.cx+c.r*Math.cos(a),c.cy+c.r*Math.sin(a));}
+        endShape();
+        return c;
+    }
+    
+    // Main arcs
+    strokeWeight(3);
+    var cOL = drawArc3(pts['O.hs.L'],pts['O.wide.L'],pts['O.apex']);
+    drawArc3(pts['O.apex'],pts['O.wide.R'],pts['O.hs.R']);
+    var cIL = drawArc3(pts['I.hs.L'],pts['I.wide.L'],pts['I.apex']);
+    drawArc3(pts['I.apex'],pts['I.wide.R'],pts['I.hs.R']);
+    
+    // Pinch arcs (flat)
+    strokeWeight(2);
+    function drawArc2(p1,p3,off){
+        var mx=(p1[0]+p3[0])/2+off,my=(p1[1]+p3[1])/2;
+        return drawArc3(p1,[mx,my],p3);
+    }
+    drawArc2(pts['O.hs.L'],pts['O.pinch.L'],-6);
+    drawArc2(pts['O.hs.R'],pts['O.pinch.R'],6);
+    drawArc2(pts['I.hs.L'],pts['I.pinch.L'],-5);
+    drawArc2(pts['I.hs.R'],pts['I.pinch.R'],5);
+    
+    // Lines
+    strokeWeight(3);
+    function L(a,b){line(a[0],a[1],b[0],b[1]);}
+    L(pts['O.pinch.L'],pts['O.legTop.L']);L(pts['O.pinch.R'],pts['O.legTop.R']);
+    L(pts['I.pinch.L'],pts['I.legTop.L']);L(pts['I.pinch.R'],pts['I.legTop.R']);
+    L(pts['O.legTop.L'],[43,1244]);L(pts['O.legTop.R'],[731,1244]);
+    L(pts['I.legTop.L'],[88,1244]);L(pts['I.legTop.R'],[686,1244]);
+    
+    // Outer frame
+    strokeWeight(4);
+    line(27,50,27,1244);line(747,50,747,1244);line(27,1244,747,1244);
+    
+    // Door center divide
+    strokeWeight(2);
+    line(382,122,382,1218);
+    
+    // Door panels
+    line(88,658,382,658);line(382,658,686,658);
+    line(88,881,686,881);line(88,1049,686,1049);
+    line(88,1218,686,1218);
+    
+    // Threshold
+    strokeWeight(2);
+    line(27,1265,747,1265);
+    
+    // === PATTERN FILLS ===
+    push();
+    
+    // Left door panel: star pattern
+    fillWithStarPattern(95, 665, 280, 210, 35, ctx);
+    
+    // Right door panel
+    fillWithStarPattern(390, 665, 290, 210, 35, ctx);
+    
+    // Lower left panel
+    fillWithStarPattern(95, 888, 280, 155, 30, ctx);
+    fillWithStarPattern(390, 888, 290, 155, 30, ctx);
+    
+    // Bottom panels
+    fillWithStarPattern(95, 1055, 280, 160, 28, ctx);
+    fillWithStarPattern(390, 1055, 290, 160, 28, ctx);
+    
+    // Arch zone pattern (fills between inner and outer arch)
+    // Use the inner arch circle to determine width at each y
+    if(cIL) {
+        ctx.strokeStyle = 'rgba(192,57,43,0.25)';
+        ctx.lineWidth = 0.5;
+        for(var y=130; y<650; y+=25) {
+            // Inner arch width at this y
+            var dyI = y - cIL.cy;
+            if(Math.abs(dyI) < cIL.r) {
+                var dxI = Math.sqrt(cIL.r*cIL.r - dyI*dyI);
+                var xL = cIL.cx - dxI;
+                var xR = 774 - xL; // symmetric
+                // Draw small rosettes along this row
+                var rowW = xR - xL;
+                if(rowW > 40) {
+                    var cols = Math.floor(rowW / 25);
+                    var off = xL + (rowW - cols*25)/2;
+                    for(var col=0; col<cols; col++) {
+                        drawRosette(off + col*25 + 12.5, y + 12.5, 10, 8, ctx);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Door knocker
+    stroke(192,57,43);strokeWeight(2);noFill();
+    ellipse(395, 680, 40, 40);
+    ellipse(395, 680, 70, 70);
+    // Knocker ring detail
+    strokeWeight(1.5);
+    for(var i=0;i<12;i++){
+        var a=i*Math.PI/6;
+        var x1=395+25*Math.cos(a),y1=680+25*Math.sin(a);
+        var x2=395+35*Math.cos(a),y2=680+35*Math.sin(a);
+        line(x1,y1,x2,y2);
+    }
+    
+    pop();
+}
+</script>
+</body></html>
