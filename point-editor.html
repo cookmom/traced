@@ -20,7 +20,7 @@ button{margin-top:3px;padding:5px;color:#fff;border:none;border-radius:4px;curso
 #json-out{margin-top:4px;font-size:9px;color:#555;max-height:100px;overflow-y:auto;word-break:break-all}
 </style>
 </head><body>
-<div id="wrap"><img id="src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'"></div>
+<div id="wrap"><img id="src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'"><canvas id="cv" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas></div>
 <div id="panel">
 <h3>Points <span id="albl" style="color:#fff"></span></h3>
 <div id="coords"></div>
@@ -30,7 +30,7 @@ button{margin-top:3px;padding:5px;color:#fff;border:none;border-radius:4px;curso
 <button id="add" onclick="doAdd()">+ Add</button>
 <div id="json-out"></div>
 </div>
-<canvas id="cv" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas>
+
 
 <script>
 var P=[
