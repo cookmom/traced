@@ -6,7 +6,7 @@
 body{background:#1a1a1a;color:#eee;font-family:'SF Mono',monospace;overflow:hidden;touch-action:none}
 #wrap{position:relative;display:inline-block;transform-origin:0 0}
 #wrap img{display:block;max-height:100vh;max-width:100vw;-webkit-user-drag:none;user-select:none}
-#panel{position:fixed;top:8px;right:8px;background:rgba(0,0,0,0.92);padding:10px;border-radius:8px;z-index:100;max-height:95vh;overflow-y:auto;width:220px;font-size:11px}
+#panel{position:fixed;top:8px;right:8px;background:rgba(0,0,0,0.75);padding:10px;border-radius:8px;z-index:100;max-height:95vh;overflow-y:auto;width:180px;font-size:11px}
 #panel h3{margin-bottom:6px;font-size:12px;color:#888}
 .row{display:flex;justify-content:space-between;padding:3px 5px;border-bottom:1px solid #222;cursor:pointer;border-radius:3px}
 .row:hover{background:#333}
@@ -21,7 +21,7 @@ button{margin-top:3px;padding:5px;color:#fff;border:none;border-radius:4px;curso
 </style>
 </head><body>
 <div id="wrap"><img id="src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'"><canvas id="cv" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas></div>
-<div id="panel">
+<div id="panel"><button onclick="this.parentElement.style.display="none"" style="float:right;background:none;border:none;color:#666;cursor:pointer;font-size:16px;margin:0;padding:0;width:auto">✕</button>
 <h3>Points <span id="albl" style="color:#fff"></span></h3>
 <div id="coords"></div>
 <div id="measures"></div>
