@@ -73,10 +73,10 @@ var curves=[
   {pts:['OA','OWR','OHR'],c:'o',l:'Outer R arc'},
   {pts:['IHL','IWL','IA'],c:'i',l:'Inner L arc'},
   {pts:['IA','IWR','IHR'],c:'i',l:'Inner R arc'},
-  {pts:['OTRL','OPLL','OHL'],c:'o',l:'Outer pinch L'},
-  {pts:['OTRR','OPLR','OHR'],c:'o',l:'Outer pinch R'},
-  {pts:['ITRL','IPLL','IHL'],c:'i',l:'Inner pinch L'},
-  {pts:['ITRR','IPLR','IHR'],c:'i',l:'Inner pinch R'},
+  {pts:['OTRL','OPLL','OHL'],c:'o',l:'Outer pinch L',flip:true},
+  {pts:['OTRR','OPLR','OHR'],c:'o',l:'Outer pinch R',flip:true},
+  {pts:['ITRL','IPLL','IHL'],c:'i',l:'Inner pinch L',flip:true},
+  {pts:['ITRR','IPLR','IHR'],c:'i',l:'Inner pinch R',flip:true},
 ];
 var lines_def=[
   
@@ -135,6 +135,7 @@ function render(){
     // Otherwise go the other way
     var sweep=d13;
     if(d12*d13<0||(Math.abs(d12)>Math.abs(d13))){sweep=d13>0?d13-2*Math.PI:d13+2*Math.PI;}
+    if(cur.flip){sweep=sweep>0?sweep-2*Math.PI:sweep+2*Math.PI;}
     for(var i=0;i<=steps;i++){
       var t=i/steps;
       var a=a1+sweep*t;
