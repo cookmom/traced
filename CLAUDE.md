@@ -147,3 +147,25 @@ At y=200, the right arc is at x≈450 — this is GEOMETRICALLY CORRECT.
 The arch is wide at the bottom and narrow at the top. Don't expect x=650 at y=200.
 If the source image shows a wider arch at mid-height, the springing points or apex are wrong,
 not the arc rendering.
+
+### Lesson 16: My point estimates were ALL wrong — let the human place them
+Moroccan pointed horseshoe arch — my estimates vs Tawfeeq's corrections:
+- Apex: y=136 → y=77 (59px off — arch is MUCH higher than I thought)
+- Horseshoe: y=480 → y=621 (141px off — pinch is MUCH lower)
+- Wide points: y=380 → y=476 (96px off)
+- Outer width: 605px → 684px (arch is wider)
+- Legs: x=100→675 → x=70→704 (legs are further out)
+
+**Lesson: BUILD AN INTERACTIVE EDITOR and let the human place points.**
+Don't guess coordinates from pixel analysis on complex textured images.
+The point editor with live arc preview is the correct tool.
+
+### Islamic Arch Feature Point Template
+For a pointed horseshoe arch, mark these 14+ points:
+- OA/IA: Outer/Inner Apex (the point where two arcs meet)
+- OWL/OWR, IWL/IWR: Widest points of the arch (horseshoe bulge)
+- OHL/OHR, IHL/IHR: Horseshoe points (where curve reverses to meet legs)
+- OTLL/OTLR, ITLL/ITLR: Leg tops (may differ from horseshoe points)
+- OLL/OLR, ILL/ILR: Leg bottoms
+
+Arc construction: fit circle through 3 points (HS → Wide → Apex) for each half.
