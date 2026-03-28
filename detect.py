@@ -320,7 +320,8 @@ def _fit_blob(points, min_line_length=30):
     cr = fit_circle_ransac(points, max_radius=1000)
     cc = np.sum(cr[4]) if cr else 0
     
-    min_pts = max(10, min(len(points) * 0.15, 80))  # cap at 80 for large complex blobs
+    # One principle: a primitive must explain a meaningful fraction of what remains
+    min_pts = max(10, len(points) * 0.10)  # at least 10% of remaining blob
     
     # Circle: only valid if it explains >50% of the blob
     circle_valid = cc >= min_pts and cc > len(points) * 0.5
@@ -349,7 +350,7 @@ def _fit_blob(points, min_line_length=30):
     return None
 
 
-def detect_primitives(edge_points, image_shape, min_line_length=80):
+def detect_primitives(edge_points, image_shape, min_line_length=30):
     """Cluster edge pixels into blobs, fit primitives per blob."""
     H, W = image_shape
     blobs = _cluster_edges(edge_points, max_gap=4.0)
@@ -377,19 +378,7 @@ def detect_primitives(edge_points, image_shape, min_line_length=80):
             remaining = remaining[~result['mask']]
         unexplained += len(remaining)
     
-    # Post-filter: remove tiny primitives (noise at junctions)
-    filtered = []
-    for p in primitives:
-        if p['type'] == 'arc' and (p['n_inliers'] < 30 or p['params']['radius'] < 25):
-            unexplained += p['n_inliers']
-            continue
-        if p['type'] == 'line' and p['n_inliers'] < 15:
-            unexplained += p['n_inliers']
-            continue
-        filtered.append(p)
-    if len(filtered) < len(primitives):
-        print(f"  Filtered: {len(primitives)} → {len(filtered)} ({len(primitives)-len(filtered)} tiny primitives removed)")
-    primitives = filtered
+    # No hard-coded filters. Primitives were already validated during detection.
     
     # Snap nearby endpoints: if a line endpoint is within 15px of an arc endpoint, snap them together
     for i, p in enumerate(primitives):
