@@ -223,3 +223,20 @@ JS
 GALLIUM_DRIVER=d3d12 MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA dev-browser --headless run /tmp/script.js
 ```
 Screenshots save to `~/.dev-browser/tmp/` — copy to workspace for messaging.
+
+### Karpathy Method for Arc Optimization
+1. Load source edges (Canny on bilateral-filtered grayscale)
+2. Build KDTree of edge pixel positions
+3. For each arc: render as polyline, compute mean distance to nearest edge pixel (chamfer)
+4. Gradient descent: nudge each anchor point ±1px in 8 directions, keep the move that reduces chamfer
+5. For pinch arcs with auto-midpoint: also sweep the offset parameter
+6. Run 50-100 iterations until convergence
+
+**Results**: main arcs 0.8-1.2px, pinch arcs 0.5-0.8px chamfer. Sub-pixel alignment.
+
+### Standard Workflow (ALWAYS follow this)
+1. **Aristotle**: identify the simplest true geometric primitives
+2. **Point editor**: human places anchor points for features AI can't accurately detect
+3. **Karpathy**: gradient descent optimizes points against source edges
+4. **dev-browser**: verify every change visually before sending
+5. **Skill update**: document every lesson, every tool usage pattern, every architecture decision
