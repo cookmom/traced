@@ -136,3 +136,14 @@ Use visual understanding (Claude vision) or manual point marking, not pixel anal
 - The horseshoe pinch: the arc continues past the widest point, curving inward before meeting vertical legs
 - Band width: inner arch is offset ~30-40px from outer, tracking the same curve shape
 - Legs start at springing points and go straight down
+
+### Lesson 14: p5.js arc() in WEBGL mode is unreliable
+arc() with translate(-w/2,-h/2) draws unpredictably. Use beginShape()/vertex()/endShape() 
+to draw arcs as polylines from computed cos/sin points. This is deterministic and works correctly.
+
+### Lesson 15: Pointed arch geometry — the arc MUST narrow at the top
+A pointed arch from springing at (100,480)/(675,480) with apex at (387,136) has r=448.
+At y=200, the right arc is at x≈450 — this is GEOMETRICALLY CORRECT.
+The arch is wide at the bottom and narrow at the top. Don't expect x=650 at y=200.
+If the source image shows a wider arch at mid-height, the springing points or apex are wrong,
+not the arc rendering.
