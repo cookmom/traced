@@ -189,8 +189,12 @@ def fit_circle_ransac(points, n_iter=300, threshold=3.0, min_radius=15, max_radi
     
     # Compute arc sweep from inlier angles
     inlier_pts = points[best_inliers]
+    if len(inlier_pts) < 3:
+        return None
     angles = np.arctan2(inlier_pts[:, 1] - center[1], inlier_pts[:, 0] - center[0])
     angles_sorted = np.sort(angles)
+    if len(angles_sorted) == 0:
+        return None
     
     # Check if it's a full circle or partial arc
     gaps = np.diff(angles_sorted)
