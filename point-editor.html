@@ -60,7 +60,7 @@ var dragging=null, dragOff={x:0,y:0};
 function init(){
   // Load source image
   var img = document.getElementById('src');
-  img.src = 'real-test.jpg'; // relative path
+  img.src = 'real-test-mono.jpg'; // relative path
   img.onload = function(){
     scale = img.offsetWidth / imgW;
     renderPoints();
@@ -68,7 +68,7 @@ function init(){
   // Fallback: try from GitHub Pages
   img.onerror = function(){
     // Use the base64 from the page if available, or a URL
-    this.src = 'https://cookmom.github.io/traced/real-test.jpg';
+    this.src = 'https://cookmom.github.io/traced/real-test-mono.jpg';
   };
 }
 
