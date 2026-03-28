@@ -75,3 +75,30 @@ When the approach fundamentally isn't working (1483 primitives, then 574, then 1
 
 ### Lesson 11: Claude vision > edge detection for architectural understanding
 Edge detection finds every pixel intensity change equally. Claude understands WHAT the architecture is and WHERE the structural lines should be. Use Claude for the initial spec, edge analysis for refinement.
+
+## Real Image Strategy (validated 2026-03-27)
+
+### The Winning Approach: Claude Vision + Hough Refinement
+1. **Claude vision** identifies the major architectural features and estimates coordinates
+2. **HoughLinesP** (high threshold, long minLength) finds exact structural line positions
+3. **HoughCircles** (on masked arch region only) finds the arch radius/center
+4. Merge Claude's structural understanding with Hough's precise measurements
+5. Generate primitives JSON → feed to existing pipeline
+
+### Why Other Approaches Failed
+- **Pure edge detection** (RANSAC on all edges): 119K edge pixels, texture overwhelms
+- **SAM + edge detect per region**: SAM boundaries are organic, not geometric
+- **SAM boundary tracing**: SAM contours ≠ architectural lines
+- **Hough on full image**: too many small lines from texture
+
+### What Works
+- **Bilateral filter (d=15)** + **Canny (80/200)** + **HoughLinesP (threshold=250, minLen=250)** finds structural verticals
+- **HoughCircles on arch region only** (top 45%, middle 80% width) finds the arch
+- **Claude's architectural knowledge** provides the semantic structure (which lines form the frame, where the arch is, door panels, etc.)
+
+### Skill Pattern for New Images
+1. Run HoughLinesP with high thresholds → strongest lines
+2. Identify which lines are frame, walls, dividers (from position/length)
+3. Mask the arch region → HoughCircles → average top candidates
+4. Add door features (knocker, panels) from Claude understanding
+5. Sort by size (biggest first) → generate
