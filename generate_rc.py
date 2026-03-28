@@ -8,12 +8,14 @@ def generate_html(optimized, name="Building", ref_image_path=None):
     H = optimized['canvas']['h']
     primitives = optimized['primitives']
     
-    # Sort: bottom→top, right→left
+    # Sort: largest primitives first (most prominent architectural features)
     def sort_key(p):
         params = p['params']
-        if p['type'] == 'line':
-            return (-max(params['y1'],params['y2']), -max(params['x1'],params['x2']))
-        return (-(params['cy']+params['radius']), -(params['cx']+params['radius']))
+        if p['type'] == 'arc':
+            return -params['radius'] * abs(params['sweep'])  # bigger arc = more prominent
+        else:
+            import math as m
+            return -m.sqrt((params['x2']-params['x1'])**2+(params['y2']-params['y1'])**2)  # longer line first
     primitives = sorted(primitives, key=sort_key)
     
     steps_js = []
