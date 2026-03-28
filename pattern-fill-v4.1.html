@@ -1,0 +1,368 @@
+<!-- بسم الله الرحمن الرحيم -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traced — Moroccan Door v4</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}
+#wrap{position:relative;height:100vh;width:calc(100vh*774/1280)}
+#ref-src{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.22;filter:grayscale(100%);z-index:1}
+canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important;z-index:2}
+</style>
+</head><body>
+<div id="wrap">
+<img id="ref-src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'">
+</div>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<script>
+var W=774, H=1280;
+var PHI = (1+Math.sqrt(5))/2;
+
+// ============================================================
+// EMERGENT PATTERN: Islamic 8-fold from overlapping circles
+// The pattern EMERGES from a circle grid. We don't stamp shapes —
+// we lay circles and draw lines between their intersections.
+// ============================================================
+
+// Compute intersection points of two circles
+function circleIntersections(x1,y1,r1, x2,y2,r2) {
+    var dx = x2-x1, dy = y2-y1;
+    var d = Math.sqrt(dx*dx + dy*dy);
+    if (d > r1+r2 || d < Math.abs(r1-r2) || d === 0) return [];
+    var a = (r1*r1 - r2*r2 + d*d) / (2*d);
+    var h = Math.sqrt(Math.max(0, r1*r1 - a*a));
+    var mx = x1 + a*dx/d, my = y1 + a*dy/d;
+    var px = -dy*h/d, py = dx*h/d;
+    return [[mx+px, my+py], [mx-px, my-py]];
+}
+
+// Clip line to rectangle, return clipped endpoints or null
+function clipLine(x1,y1,x2,y2, bx,by,bw,bh) {
+    var t0=0, t1=1;
+    var dx=x2-x1, dy=y2-y1;
+    var clips = [[-dx, x1-bx], [dx, bx+bw-x1], [-dy, y1-by], [dy, by+bh-y1]];
+    for (var i=0; i<4; i++) {
+        var p=clips[i][0], q=clips[i][1];
+        if (p===0) { if (q<0) return null; }
+        else {
+            var r = q/p;
+            if (p<0) { if (r>t1) return null; if (r>t0) t0=r; }
+            else { if (r<t0) return null; if (r<t1) t1=r; }
+        }
+    }
+    return [x1+t0*dx, y1+t0*dy, x1+t1*dx, y1+t1*dy];
+}
+
+// Generate 8-fold Islamic star pattern within a rectangular region
+// Uses the "two overlapping square grids rotated 45°" method
+function eightFoldPattern(bx, by, bw, bh, gridSize) {
+    var r = gridSize / 2;
+    var lines = [];
+
+    // Grid of circle centers
+    var margin = gridSize * 1.5;
+    var centers = [];
+    for (var y = by - margin; y <= by + bh + margin; y += gridSize) {
+        for (var x = bx - margin; x <= bx + bw + margin; x += gridSize) {
+            centers.push([x, y]);
+        }
+    }
+
+    // Find all intersection points between adjacent circles
+    var pts = new Map(); // key → point for dedup
+    function ptKey(x,y) { return Math.round(x*10) + ',' + Math.round(y*10); }
+
+    for (var i = 0; i < centers.length; i++) {
+        for (var j = i+1; j < centers.length; j++) {
+            var dx = centers[j][0]-centers[i][0];
+            var dy = centers[j][1]-centers[i][1];
+            var dist = Math.sqrt(dx*dx+dy*dy);
+            // Only intersect adjacent circles (distance < 2r)
+            if (dist < gridSize * 1.42 && dist > 0.1) {
+                var isects = circleIntersections(
+                    centers[i][0],centers[i][1],r,
+                    centers[j][0],centers[j][1],r
+                );
+                for (var k=0; k<isects.length; k++) {
+                    var key = ptKey(isects[k][0], isects[k][1]);
+                    if (!pts.has(key)) pts.set(key, isects[k]);
+                }
+            }
+        }
+    }
+
+    // The pattern: connect intersection points that form star edges
+    // For each circle, its intersection points form a polygon — connect adjacent ones
+    for (var i = 0; i < centers.length; i++) {
+        var cx = centers[i][0], cy = centers[i][1];
+        // Find all intersection points on this circle
+        var onCircle = [];
+        pts.forEach(function(pt) {
+            var dx = pt[0]-cx, dy = pt[1]-cy;
+            var dist = Math.sqrt(dx*dx+dy*dy);
+            if (Math.abs(dist - r) < 1.5) {
+                onCircle.push({x:pt[0], y:pt[1], angle: Math.atan2(dy,dx)});
+            }
+        });
+        // Sort by angle
+        onCircle.sort(function(a,b) { return a.angle - b.angle; });
+        // Connect adjacent points (this creates the star pattern)
+        for (var k = 0; k < onCircle.length; k++) {
+            var next = (k+1) % onCircle.length;
+            var cl = clipLine(
+                onCircle[k].x, onCircle[k].y,
+                onCircle[next].x, onCircle[next].y,
+                bx, by, bw, bh
+            );
+            if (cl) lines.push(cl);
+        }
+    }
+
+    return lines;
+}
+
+// Generate 6-fold pattern (hexagonal grid based)
+function sixFoldPattern(bx, by, bw, bh, gridSize) {
+    var r = gridSize / 2;
+    var lines = [];
+    var margin = gridSize * 1.5;
+    var centers = [];
+
+    // Hexagonal grid
+    var rowH = gridSize * Math.sqrt(3)/2;
+    var row = 0;
+    for (var y = by - margin; y <= by + bh + margin; y += rowH) {
+        var offset = (row % 2) * gridSize/2;
+        for (var x = bx - margin; x <= bx + bw + margin; x += gridSize) {
+            centers.push([x + offset, y]);
+        }
+        row++;
+    }
+
+    var pts = new Map();
+    function ptKey(x,y) { return Math.round(x*10)+','+Math.round(y*10); }
+
+    for (var i = 0; i < centers.length; i++) {
+        for (var j = i+1; j < centers.length; j++) {
+            var dx = centers[j][0]-centers[i][0];
+            var dy = centers[j][1]-centers[i][1];
+            var dist = Math.sqrt(dx*dx+dy*dy);
+            if (dist < gridSize*1.15 && dist > 0.1) {
+                var isects = circleIntersections(centers[i][0],centers[i][1],r, centers[j][0],centers[j][1],r);
+                for (var k=0;k<isects.length;k++) {
+                    var key=ptKey(isects[k][0],isects[k][1]);
+                    if(!pts.has(key)) pts.set(key,isects[k]);
+                }
+            }
+        }
+    }
+
+    for (var i = 0; i < centers.length; i++) {
+        var cx=centers[i][0],cy=centers[i][1];
+        var onCircle=[];
+        pts.forEach(function(pt){
+            var dx=pt[0]-cx,dy=pt[1]-cy;
+            if(Math.abs(Math.sqrt(dx*dx+dy*dy)-r)<1.5)
+                onCircle.push({x:pt[0],y:pt[1],angle:Math.atan2(dy,dx)});
+        });
+        onCircle.sort(function(a,b){return a.angle-b.angle;});
+        for (var k=0;k<onCircle.length;k++) {
+            var next=(k+1)%onCircle.length;
+            var cl=clipLine(onCircle[k].x,onCircle[k].y,onCircle[next].x,onCircle[next].y,bx,by,bw,bh);
+            if(cl) lines.push(cl);
+        }
+    }
+    return lines;
+}
+
+// Draw a set of lines
+function drawLines(lines, sw, alpha) {
+    push(); stroke(192,57,43,alpha); strokeWeight(sw); noFill();
+    for (var i = 0; i < lines.length; i++) {
+        line(lines[i][0], lines[i][1], lines[i][2], lines[i][3]);
+    }
+    pop();
+}
+
+// Pretext-style: generate emergent pattern within arch shape
+function archPattern(archCircle, yStart, yEnd, gridSize) {
+    var r = gridSize/2;
+    var margin = gridSize;
+    var centers = [];
+    var rowH = gridSize * Math.sqrt(3)/2;
+    var row = 0;
+    for (var y = yStart-margin; y <= yEnd+margin; y += rowH) {
+        var offset = (row%2)*gridSize/2;
+        // Only place circles within the arch width at this y
+        var dy = y - archCircle.cy;
+        if (Math.abs(dy) >= archCircle.r) { row++; continue; }
+        var dx = Math.sqrt(archCircle.r*archCircle.r - dy*dy);
+        var xL = archCircle.cx - dx + 10;
+        var xR = 387 + (387 - xL);
+        for (var x = xL-margin; x <= xR+margin; x += gridSize) {
+            if (x+offset > xL-gridSize && x+offset < xR+gridSize)
+                centers.push([x+offset, y]);
+        }
+        row++;
+    }
+
+    var pts = new Map();
+    function ptKey(x,y){return Math.round(x*10)+','+Math.round(y*10);}
+    for (var i=0;i<centers.length;i++) {
+        for (var j=i+1;j<centers.length;j++) {
+            var ddx=centers[j][0]-centers[i][0],ddy=centers[j][1]-centers[i][1];
+            var dist=Math.sqrt(ddx*ddx+ddy*ddy);
+            if (dist<gridSize*1.15&&dist>0.1) {
+                var isects=circleIntersections(centers[i][0],centers[i][1],r,centers[j][0],centers[j][1],r);
+                for(var k=0;k<isects.length;k++){
+                    var key=ptKey(isects[k][0],isects[k][1]);
+                    if(!pts.has(key))pts.set(key,isects[k]);
+                }
+            }
+        }
+    }
+
+    var lines = [];
+    for (var i=0;i<centers.length;i++) {
+        var cx=centers[i][0],cy=centers[i][1];
+        var onCircle=[];
+        pts.forEach(function(pt){
+            var ddx=pt[0]-cx,ddy=pt[1]-cy;
+            if(Math.abs(Math.sqrt(ddx*ddx+ddy*ddy)-r)<1.5)
+                onCircle.push({x:pt[0],y:pt[1],angle:Math.atan2(ddy,ddx)});
+        });
+        onCircle.sort(function(a,b){return a.angle-b.angle;});
+        for(var k=0;k<onCircle.length;k++){
+            var next=(k+1)%onCircle.length;
+            // Clip to arch shape: both endpoints must be inside arch
+            var p1=onCircle[k],p2=onCircle[next];
+            var dy1=p1.y-archCircle.cy, dy2=p2.y-archCircle.cy;
+            var ok1 = Math.abs(dy1)<archCircle.r && Math.abs(p1.x-387)<Math.sqrt(Math.max(0,archCircle.r*archCircle.r-dy1*dy1))+5;
+            var ok2 = Math.abs(dy2)<archCircle.r && Math.abs(p2.x-387)<Math.sqrt(Math.max(0,archCircle.r*archCircle.r-dy2*dy2))+5;
+            if(ok1&&ok2) lines.push([p1.x,p1.y,p2.x,p2.y]);
+        }
+    }
+    return lines;
+}
+
+// ============================================================
+// GEOMETRY (TRACED anchor points)
+// ============================================================
+function fitCircle3(p1,p2,p3){
+    var ax=p1[0],ay=p1[1],bx=p2[0],by=p2[1],cx=p3[0],cy=p3[1];
+    var D=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
+    if(Math.abs(D)<0.01)return null;
+    var ux=((ax*ax+ay*ay)*(by-cy)+(bx*bx+by*by)*(cy-ay)+(cx*cx+cy*cy)*(ay-by))/D;
+    var uy=((ax*ax+ay*ay)*(cx-bx)+(bx*bx+by*by)*(ax-cx)+(cx*cx+cy*cy)*(bx-ax))/D;
+    return{cx:ux,cy:uy,r:Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy))};
+}
+function drawArc3(p1,p2,p3){
+    var c=fitCircle3(p1,p2,p3);if(!c)return c;
+    var a1=Math.atan2(p1[1]-c.cy,p1[0]-c.cx);
+    var a2=Math.atan2(p2[1]-c.cy,p2[0]-c.cx);
+    var a3=Math.atan2(p3[1]-c.cy,p3[0]-c.cx);
+    var d12=a2-a1,d13=a3-a1;
+    while(d12>Math.PI)d12-=TAU;while(d12<-Math.PI)d12+=TAU;
+    while(d13>Math.PI)d13-=TAU;while(d13<-Math.PI)d13+=TAU;
+    var sw=d13;
+    if(d12*d13<0||(Math.abs(d12)>Math.abs(d13)))sw=d13>0?d13-TAU:d13+TAU;
+    beginShape();
+    for(var i=0;i<=60;i++){var t=i/60;var a=a1+sw*t;vertex(c.cx+c.r*Math.cos(a),c.cy+c.r*Math.sin(a));}
+    endShape();
+    return c;
+}
+function drawArc2(p1,p3,off){
+    var mx=(p1[0]+p3[0])/2+off,my=(p1[1]+p3[1])/2;
+    drawArc3(p1,[mx,my],p3);
+}
+
+// ============================================================
+function setup() {
+    createCanvas(W, H, WEBGL);
+    pixelDensity(1);
+    brush.load();
+    select('canvas').parent('wrap');
+    noLoop();
+}
+
+function draw() {
+    translate(-W/2, -H/2);
+    noFill();
+
+    var p = {
+        OA:[387,78], OhL:[73,621], OhR:[701,621], OwL:[46,475], OwR:[728,475],
+        IA:[387,122], IhL:[118,635], IhR:[656,635], IwL:[89,476], IwR:[685,476],
+        OpL:[55,671], OpR:[719,671], IpL:[102,656], IpR:[672,656],
+        OtL:[43,670], OtR:[731,670], ItL:[88,658], ItR:[686,658]
+    };
+
+    // ========== EMERGENT PATTERNS ==========
+
+    // Door panels: 8-fold star pattern (different scales per panel tier)
+    // Upper panels — largest grid (most breathing room)
+    var upperL = eightFoldPattern(95, 668, 280, 206, 52);
+    var upperR = eightFoldPattern(392, 668, 288, 206, 52);
+    drawLines(upperL, 1.4, 180);
+    drawLines(upperR, 1.4, 180);
+
+    // Middle panels — medium grid
+    var midL = eightFoldPattern(95, 888, 280, 155, 44);
+    var midR = eightFoldPattern(392, 888, 288, 155, 44);
+    drawLines(midL, 1.2, 160);
+    drawLines(midR, 1.2, 160);
+
+    // Lower panels — finest grid (densest detail, graded)
+    var lowL = eightFoldPattern(95, 1055, 280, 158, 38);
+    var lowR = eightFoldPattern(392, 1055, 288, 158, 38);
+    drawLines(lowL, 1.0, 150);
+    drawLines(lowR, 1.0, 150);
+
+    // Arch zone: 6-fold pattern shaped to arch (Pretext method)
+    var archC = fitCircle3(p.IhL, p.IwL, p.IA);
+    if (archC) {
+        var archLines = archPattern(archC, 135, 630, 32);
+        drawLines(archLines, 1.0, 140);
+    }
+
+    // Spandrels: 6-fold pattern in triangular zones
+    // Left spandrel (x=27-80, y=50-620)
+    var spL = sixFoldPattern(30, 55, 55, 570, 22);
+    drawLines(spL, 0.8, 130);
+    // Right spandrel
+    var spR = sixFoldPattern(690, 55, 55, 570, 22);
+    drawLines(spR, 0.8, 130);
+
+    // Border strips: tiny 8-fold between legs (x=43-88 and x=686-731)
+    var brdL = eightFoldPattern(45, 670, 40, 570, 18);
+    var brdR = eightFoldPattern(689, 670, 40, 570, 18);
+    drawLines(brdL, 0.7, 120);
+    drawLines(brdR, 0.7, 120);
+
+    // ========== STRUCTURE ==========
+
+    stroke(192,57,43); strokeWeight(3); noFill();
+    drawArc3(p.OhL,p.OwL,p.OA); drawArc3(p.OA,p.OwR,p.OhR);
+    drawArc3(p.IhL,p.IwL,p.IA); drawArc3(p.IA,p.IwR,p.IhR);
+
+    strokeWeight(2);
+    drawArc2(p.OhL,p.OpL,-6); drawArc2(p.OhR,p.OpR,6);
+    drawArc2(p.IhL,p.IpL,-5); drawArc2(p.IhR,p.IpR,5);
+
+    strokeWeight(3);
+    line(p.OpL[0],p.OpL[1],p.OtL[0],p.OtL[1]); line(p.OpR[0],p.OpR[1],p.OtR[0],p.OtR[1]);
+    line(p.IpL[0],p.IpL[1],p.ItL[0],p.ItL[1]); line(p.IpR[0],p.IpR[1],p.ItR[0],p.ItR[1]);
+    line(43,670,43,1244); line(731,670,731,1244);
+    line(88,658,88,1244); line(686,658,686,1244);
+
+    strokeWeight(4);
+    line(27,50,27,1244); line(747,50,747,1244); line(27,1244,747,1244); line(27,50,747,50);
+
+    strokeWeight(2.5);
+    line(387,122,387,1218);
+    strokeWeight(2);
+    line(88,658,686,658);
+    line(88,881,686,881); line(88,1049,686,1049); line(88,1218,686,1218);
+    line(27,1265,747,1265);
+}
+</script>
+</body></html>
