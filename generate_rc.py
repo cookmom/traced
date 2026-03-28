@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ruler-and-Compass Generator — draws lines + arcs with native p5."""
+"""Ruler-and-Compass Generator — native p5 strokes + p5.brush fills."""
 import argparse, json, math, base64
 from pathlib import Path
 
@@ -8,34 +8,27 @@ def generate_html(optimized, name="Building", ref_image_path=None):
     H = optimized['canvas']['h']
     primitives = optimized['primitives']
     
-    # Sort: bottom→top, right→left (like a right-handed draftsman)
+    # Sort: bottom→top, right→left
     def sort_key(p):
         params = p['params']
         if p['type'] == 'line':
-            cy = max(params['y1'], params['y2'])  # bottom-most point
-            cx = max(params['x1'], params['x2'])
-        else:
-            cy = params['cy'] + params['radius']  # bottom of arc
-            cx = params['cx'] + params['radius']
-        return (-cy, -cx)  # negative = bottom first, right first
-    
+            return (-max(params['y1'],params['y2']), -max(params['x1'],params['x2']))
+        return (-(params['cy']+params['radius']), -(params['cx']+params['radius']))
     primitives = sorted(primitives, key=sort_key)
     
-    # Build drawing steps
-    curve_defs = []
     steps_js = []
     for p in primitives:
         params = p['params']
-        pname = p['name'].upper().replace('_', ' ')
+        pname = p['name'].upper().replace('_',' ')
         if p['type'] == 'line':
             x1,y1,x2,y2 = params['x1'],params['y1'],params['x2'],params['y2']
-            dx, dy = x2-x1, y2-y1
+            dx,dy = x2-x1, y2-y1
             length = math.sqrt(dx*dx+dy*dy)
             bbox = f'[{int(min(x1,x2)-5)},{int(min(y1,y2)-5)},{int(max(x1,x2)+5)},{int(max(y1,y2)+5)}]'
-            steps_js.append(f"""  {{name:'{pname}',formula:'line L={length:.0f}',dur:{max(0.2,length/500):.2f},bbox:{bbox},draw:function(p){{
-      push();stroke(192,57,43);strokeWeight(2);
+            steps_js.append(f"""  {{name:'{pname}',formula:'line L={length:.0f}',dur:{max(0.3,length/400):.2f},bbox:{bbox},draw:function(p){{
+      stroke(192,57,43);strokeWeight(2);
       line({x1:.0f},{y1:.0f},{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p);
-      pop();return [{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p];}}}}""")
+      return [{x1:.0f}+{dx:.0f}*p,{y1:.0f}+{dy:.0f}*p];}}}}""")
         elif p['type'] == 'arc':
             cx,cy,r = params['cx'],params['cy'],params['radius']
             start,sweep = params['start_angle'],params['sweep']
@@ -43,53 +36,32 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             is_circ = sweep_deg > 350
             bbox = f'[{int(cx-r-10)},{int(cy-r-10)},{int(cx+r+10)},{int(cy+r+10)}]'
             formula = f'circle R={r:.0f}' if is_circ else f'arc {sweep_deg:.0f}° R={r:.0f}'
-            dur = max(0.5, sweep_deg/250)
-            d = r * 2
-            # Compass drawing: plant at center, sweep the arc progressively
-            # p5.js arc(x, y, w, h, start, stop) in WEBGL mode
-            if is_circ:
-                actual_sweep = 2 * math.pi
-                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
-      push();noFill();
-      stroke(192,57,43);strokeWeight(2);
-      arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},{start:.4f}+{actual_sweep:.4f}*p);
-      if(p<1){{var a={start:.4f}+{actual_sweep:.4f}*p;
-        stroke(192,57,43,60);strokeWeight(0.8);
-        line({cx:.1f},{cy:.1f},{cx:.1f}+{r:.1f}*Math.cos(a),{cy:.1f}+{r:.1f}*Math.sin(a));
-        fill(192,57,43);noStroke();ellipse({cx:.1f},{cy:.1f},5,5);}}
-      pop();
-      var a2={start:.4f}+{actual_sweep:.4f}*p;
-      return [{cx:.1f}+{r:.1f}*Math.cos(a2),{cy:.1f}+{r:.1f}*Math.sin(a2)];
-    }}}}""")
-            else:
-                steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
-      push();noFill();
-      stroke(192,57,43);strokeWeight(2);
-      var s1={start:.4f}+{sweep:.4f}*p;
+            dur = max(0.6, sweep_deg/200)
+            d = r*2
+            actual_sweep = 2*math.pi*(1 if sweep>0 else -1) if is_circ else sweep
+            steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
+      noFill();stroke(192,57,43);strokeWeight(2);
+      var s1={start:.4f}+{actual_sweep:.4f}*p;
       arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},s1);
       if(p<1){{stroke(192,57,43,60);strokeWeight(0.8);
         line({cx:.1f},{cy:.1f},{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1));
-        fill(192,57,43);noStroke();ellipse({cx:.1f},{cy:.1f},5,5);}}
-      pop();
-      return [{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1)];
-    }}}}""")
+        fill(192,57,43);noStroke();ellipse({cx:.1f},{cy:.1f},5,5);noFill();}}
+      return [{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1)];}}}}""")
     
-    all_curves = "\n    ".join(curve_defs) if curve_defs else "// no curve arrays needed"
     all_steps = ",\n".join(steps_js)
     
-    # Source image as HTML img (grey, behind canvas)
     ref_img_tag = ""
     if ref_image_path and Path(ref_image_path).exists():
-        with open(ref_image_path, "rb") as f:
+        with open(ref_image_path,"rb") as f:
             b64 = base64.b64encode(f.read()).decode()
-        ext = Path(ref_image_path).suffix.lower().replace(".", "")
+        ext = Path(ref_image_path).suffix.lower().replace(".","")
         mime = "jpeg" if ext in ("jpg","jpeg") else ext
         ref_img_tag = f'<img id="ref-src" src="data:image/{mime};base64,{b64}">'
     
     html = f"""<!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html><html><head><meta charset="utf-8">
 <script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
-<!-- ruler and compass only — no brush needed -->
+<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <style>
 *{{margin:0;padding:0}}
 body{{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}}
@@ -119,7 +91,6 @@ canvas{{position:absolute;top:0;left:0;width:100%!important;height:100%!importan
 </div>
 <script>
 var W={W},H={H},cx=W/2;
-    {all_curves}
 var FPS=30,_hs=1,trackBox=null,pencilDot=null;
 var STEPS=[
 {all_steps}
@@ -141,7 +112,7 @@ function createTrackBox(step){{
   if(b[1]*s-pad<60){{info.style.bottom='auto';info.style.top='6px';}}
   var lbl=document.createElement('div');lbl.className='hud-label';lbl.textContent=step.name;info.appendChild(lbl);
   var frm=document.createElement('div');frm.className='hud-formula';frm.textContent=step.formula;info.appendChild(frm);
-  var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:\u2014 y:\u2014';info.appendChild(crd);
+  var crd=document.createElement('div');crd.className='hud-coords';crd.id='live-coords';crd.textContent='x:\\u2014 y:\\u2014';info.appendChild(crd);
   box.appendChild(info);hud.appendChild(box);trackBox=box;
 }}
 function updateDot(x,y){{
@@ -153,22 +124,33 @@ function updateDot(x,y){{
 function setup(){{
   var c=createCanvas(W,H,WEBGL);pixelDensity(1);c.parent('wrap');
   _hs=document.getElementById('wrap').offsetWidth/W;
+  brush.load();
   frameRate(FPS);
   window.addEventListener('resize',function(){{_hs=document.getElementById('wrap').offsetWidth/W;}});
 }}
 function draw(){{
   translate(-width/2,-height/2);
-  clear();// Clear each frame — redraw everything (needed for compass arm animation)
+  // Clear + redraw all completed strokes (native p5 = deterministic, fast)
+  clear();
+  push();noFill();
+  for(var i=0;i<STEPS.length;i++){{
+    if(STEPS[i]._done)STEPS[i].draw(1);
+  }}
+  pop();
+  // Active step
   var f3=Math.min(frameCount-1,totalAnimFrames-1);
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
-  // Redraw all completed steps
-  for(var i=0;i<activeStep;i++)STEPS[i].draw(1);
+  // Mark newly completed
+  for(var i=0;i<activeStep;i++)STEPS[i]._done=true;
+  // Draw active step progress
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);
-  var tip=STEPS[activeStep].draw(prog);
+  push();noFill();var tip=STEPS[activeStep].draw(prog);pop();
+  if(prog>=1)STEPS[activeStep]._done=true;
+  // HUD
   if(activeStep!==lastHudStep){{createTrackBox(STEPS[activeStep]);lastHudStep=activeStep;}}
   if(trackBox){{var b=STEPS[activeStep].bbox,s=_hs,pad=10*s;trackBox.style.left=(b[0]*s-pad)+'px';trackBox.style.top=(b[1]*s-pad)+'px';}}
   if(tip)updateDot(tip[0],tip[1]);
-  if(f3>=totalAnimFrames-1){{noLoop();if(pencilDot)pencilDot.style.display='none';if(trackBox)setTimeout(function(){{trackBox.remove();trackBox=null;}},3000);}};
+  if(f3>=totalAnimFrames-1){{noLoop();if(pencilDot)pencilDot.style.display='none';if(trackBox)setTimeout(function(){{trackBox.remove();trackBox=null;}},3000);}}
 }}
 </script>
 </body></html>"""
