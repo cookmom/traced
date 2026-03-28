@@ -1,6 +1,6 @@
 <!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Traced — Moroccan Zellige Door</title>
+<title>Traced — Moroccan Zellige Door v2</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}
@@ -16,216 +16,249 @@ canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important
 <script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <script>
 var W=774, H=1280;
+var PHI = 1.618033988749895; // Golden ratio
+var PHI_INV = 1/PHI;         // 0.618...
+var PHI_INV2 = PHI_INV*PHI_INV; // 0.382...
+var PHI_INV3 = PHI_INV2*PHI_INV; // 0.236...
 
-// ==========================================
-// HASBA METHOD: 16-fold zellige star
-// Central rosette → regulation lines → interstice shapes
-// ==========================================
-function zelligeStar16(cx, cy, r) {
+// ============================================================
+// PATTERN PRIMITIVES — ruler & compass only
+// ============================================================
+
+// 16-fold zellige star (Hasba primary rosette)
+function star16(cx, cy, r) {
     var n = 16;
-    var outerR = r;
-    var midR = r * 0.62;
-    var innerR = r * 0.38;
-    // 16-pointed star: alternate outer and inner vertices
     beginShape();
     for (var i = 0; i < n; i++) {
-        var aOuter = (i / n) * TAU - TAU / (n * 2);
-        vertex(cx + outerR * Math.cos(aOuter), cy + outerR * Math.sin(aOuter));
-        // Kite notch toward center
-        var aInner = ((i + 0.5) / n) * TAU - TAU / (n * 2);
-        vertex(cx + innerR * Math.cos(aInner), cy + innerR * Math.sin(aInner));
+        var aO = (i/n) * TAU - TAU/(n*2);
+        vertex(cx + r * Math.cos(aO), cy + r * Math.sin(aO));
+        var aI = ((i+0.5)/n) * TAU - TAU/(n*2);
+        vertex(cx + r*0.38 * Math.cos(aI), cy + r*0.38 * Math.sin(aI));
     }
     endShape(CLOSE);
     // Inner regulation circle
-    ellipse(cx, cy, innerR * 2, innerR * 2);
-    // Regulation spokes (every other)
+    ellipse(cx, cy, r*0.76, r*0.76);
+    // 8 regulation spokes
     for (var i = 0; i < 8; i++) {
-        var a = (i / 8) * TAU;
-        line(cx + innerR * Math.cos(a), cy + innerR * Math.sin(a),
-             cx + midR * Math.cos(a), cy + midR * Math.sin(a));
+        var a = (i/8)*TAU;
+        line(cx + r*0.38*Math.cos(a), cy + r*0.38*Math.sin(a),
+             cx + r*0.62*Math.cos(a), cy + r*0.62*Math.sin(a));
     }
 }
 
-// Cross interstice — fills gaps between stars in Hasba grid
-function intersticeX(cx, cy, s) {
-    var arm = s * 0.4;
-    var w = s * 0.15;
-    // 4 arms
-    for (var i = 0; i < 4; i++) {
-        var a = i * Math.PI / 2;
-        var ca = Math.cos(a), sa = Math.sin(a);
-        var pa = Math.cos(a + Math.PI/2), pb = Math.sin(a + Math.PI/2);
+// 12-fold rosette (shamsa/solar — for arch zone)
+function star12(cx, cy, r) {
+    var n = 12;
+    beginShape();
+    for (var i = 0; i < n; i++) {
+        var aO = (i/n)*TAU;
+        vertex(cx + r*Math.cos(aO), cy + r*Math.sin(aO));
+        var aI = ((i+0.5)/n)*TAU;
+        vertex(cx + r*0.42*Math.cos(aI), cy + r*0.42*Math.sin(aI));
+    }
+    endShape(CLOSE);
+    // Petal arcs (bezier via vertex)
+    for (var i = 0; i < n; i++) {
+        var a1 = (i/n)*TAU, a2 = ((i+1)/n)*TAU, mid = (a1+a2)/2;
         beginShape();
-        vertex(cx + w*pa, cy + w*pb);
-        vertex(cx + arm*ca + w*pa, cy + arm*sa + w*pb);
-        vertex(cx + arm*ca - w*pa, cy + arm*sa - w*pb);
-        vertex(cx - w*pa, cy - w*pb);
+        for (var j = 0; j <= 8; j++) {
+            var t = j/8;
+            var sx = cx+r*0.32*Math.cos(a1), sy = cy+r*0.32*Math.sin(a1);
+            var mx = cx+r*0.68*Math.cos(mid), my = cy+r*0.68*Math.sin(mid);
+            var ex = cx+r*0.32*Math.cos(a2), ey = cy+r*0.32*Math.sin(a2);
+            vertex((1-t)*(1-t)*sx+2*(1-t)*t*mx+t*t*ex, (1-t)*(1-t)*sy+2*(1-t)*t*my+t*t*ey);
+        }
+        endShape();
+    }
+    ellipse(cx, cy, r*0.5, r*0.5);
+}
+
+// 8-fold star (secondary scale)
+function star8(cx, cy, r) {
+    beginShape();
+    for (var i = 0; i < 8; i++) {
+        var aO = (i/8)*TAU - TAU/16;
+        vertex(cx + r*Math.cos(aO), cy + r*Math.sin(aO));
+        var aI = ((i+0.5)/8)*TAU - TAU/16;
+        vertex(cx + r*0.4*Math.cos(aI), cy + r*0.4*Math.sin(aI));
+    }
+    endShape(CLOSE);
+}
+
+// 6-fold star (tertiary / spandrel)
+function star6(cx, cy, r) {
+    for (var t = 0; t < 2; t++) {
+        var off = t * Math.PI/6;
+        beginShape();
+        for (var i = 0; i < 3; i++) vertex(cx+r*Math.cos(off+(i/3)*TAU), cy+r*Math.sin(off+(i/3)*TAU));
+        endShape(CLOSE);
+    }
+    ellipse(cx, cy, r*0.45, r*0.45);
+}
+
+// Cross interstice
+function crossX(cx, cy, s) {
+    var arm = s*0.4, w = s*0.14;
+    for (var i = 0; i < 4; i++) {
+        var a = i*HALF_PI;
+        var ca=Math.cos(a),sa=Math.sin(a),pa=Math.cos(a+HALF_PI),pb=Math.sin(a+HALF_PI);
+        beginShape();
+        vertex(cx+w*pa,cy+w*pb); vertex(cx+arm*ca+w*pa,cy+arm*sa+w*pb);
+        vertex(cx+arm*ca-w*pa,cy+arm*sa-w*pb); vertex(cx-w*pa,cy-w*pb);
         endShape(CLOSE);
     }
 }
 
 // Diamond interstice
-function intersticeDiamond(cx, cy, s) {
-    var d = s * 0.35;
+function diamond(cx, cy, s) {
+    var d = s*0.35;
     beginShape();
-    vertex(cx, cy - d); vertex(cx + d * 0.6, cy);
-    vertex(cx, cy + d); vertex(cx - d * 0.6, cy);
+    vertex(cx, cy-d); vertex(cx+d*0.6, cy); vertex(cx, cy+d); vertex(cx-d*0.6, cy);
     endShape(CLOSE);
 }
 
-// 8-fold rosette (lighter, for arch zone)
-function rosette8(cx, cy, r) {
-    var n = 8;
-    // Outer star
+// Kite interstice (elongated diamond — fills gaps in regulation grid)
+function kite(cx, cy, s, angle) {
+    var long = s*0.5, short = s*0.18;
+    var ca = Math.cos(angle), sa = Math.sin(angle);
+    var pa = Math.cos(angle+HALF_PI), pb = Math.sin(angle+HALF_PI);
     beginShape();
-    for (var i = 0; i < n; i++) {
-        var aO = (i / n) * TAU;
-        vertex(cx + r * Math.cos(aO), cy + r * Math.sin(aO));
-        var aI = ((i + 0.5) / n) * TAU;
-        vertex(cx + r * 0.45 * Math.cos(aI), cy + r * 0.45 * Math.sin(aI));
-    }
+    vertex(cx+long*ca, cy+long*sa); vertex(cx+short*pa, cy+short*pb);
+    vertex(cx-long*0.3*ca, cy-long*0.3*sa); vertex(cx-short*pa, cy-short*pb);
     endShape(CLOSE);
-    // Petal arcs (manual bezier via vertices)
-    for (var i = 0; i < n; i++) {
-        var a1 = (i / n) * TAU;
-        var a2 = ((i + 1) / n) * TAU;
-        var mid = (a1 + a2) / 2;
-        beginShape();
-        for (var j = 0; j <= 10; j++) {
-            var t = j / 10;
-            var sx = cx + r * 0.35 * Math.cos(a1);
-            var sy = cy + r * 0.35 * Math.sin(a1);
-            var mx = cx + r * 0.75 * Math.cos(mid);
-            var my = cy + r * 0.75 * Math.sin(mid);
-            var ex = cx + r * 0.35 * Math.cos(a2);
-            var ey = cy + r * 0.35 * Math.sin(a2);
-            var bx = (1-t)*(1-t)*sx + 2*(1-t)*t*mx + t*t*ex;
-            var by = (1-t)*(1-t)*sy + 2*(1-t)*t*my + t*t*ey;
-            vertex(bx, by);
-        }
-        endShape();
-    }
-    ellipse(cx, cy, r * 0.5, r * 0.5);
 }
 
-// 6-fold star for spandrels
-function star6(cx, cy, r) {
-    // Two overlapping triangles
-    for (var t = 0; t < 2; t++) {
-        var offset = t * Math.PI / 6;
-        beginShape();
-        for (var i = 0; i < 3; i++) {
-            var a = offset + (i / 3) * TAU;
-            vertex(cx + r * Math.cos(a), cy + r * Math.sin(a));
-        }
-        endShape(CLOSE);
-    }
-    ellipse(cx, cy, r * 0.5, r * 0.5);
-}
-
-// Interlace band (serpentine between two points)
-function interlaceBand(x1, y1, x2, y2, amplitude, periods) {
-    var dx = x2 - x1, dy = y2 - y1;
-    var len = Math.sqrt(dx*dx + dy*dy);
-    var nx = -dy/len, ny = dx/len;
+// Serpentine interlace band
+function interlace(x1,y1,x2,y2,amp,periods) {
+    var dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+    var nx=-dy/len,ny=dx/len;
     beginShape();
-    for (var i = 0; i <= 40; i++) {
-        var t = i / 40;
-        var mx = x1 + dx * t;
-        var my = y1 + dy * t;
-        var wave = Math.sin(t * periods * TAU) * amplitude;
-        vertex(mx + nx * wave, my + ny * wave);
-    }
+    for(var i=0;i<=40;i++){var t=i/40;var wave=Math.sin(t*periods*TAU)*amp;
+        vertex(x1+dx*t+nx*wave, y1+dy*t+ny*wave);}
+    endShape();
+    // Parallel strand offset
+    beginShape();
+    for(var i=0;i<=40;i++){var t=i/40;var wave=Math.sin(t*periods*TAU+PI)*amp*0.7;
+        vertex(x1+dx*t+nx*wave+nx*2, y1+dy*t+ny*wave+ny*2);}
     endShape();
 }
 
-// ==========================================
-// PRETEXT-STYLE: fill shape row by row
-// getWidth(y) returns [xLeft, xRight] at that y
-// drawUnit(cx, cy, size) draws one pattern unit
-// ==========================================
+// ============================================================
+// PRETEXT-STYLE ADAPTIVE FILL
+// ============================================================
+
+// Fill any shape row-by-row, adapting unit count to available width
 function pretextFill(getWidth, yStart, yEnd, unitSize, drawUnit) {
-    for (var y = yStart; y < yEnd; y += unitSize) {
-        var bounds = getWidth(y + unitSize / 2);
+    var rowH = unitSize;
+    for (var y = yStart; y < yEnd; y += rowH) {
+        var bounds = getWidth(y + rowH/2);
         if (!bounds) continue;
-        var xL = bounds[0], xR = bounds[1];
-        var rowW = xR - xL;
-        if (rowW < unitSize * 0.8) continue;
-        var cols = Math.floor(rowW / unitSize);
-        var offset = xL + (rowW - cols * unitSize) / 2;
+        var xL = bounds[0], xR = bounds[1], rw = xR - xL;
+        if (rw < unitSize * 0.7) continue;
+        var cols = Math.floor(rw / unitSize);
+        var gap = (rw - cols * unitSize) / (cols + 1); // distribute gaps evenly
         for (var col = 0; col < cols; col++) {
-            drawUnit(offset + col * unitSize + unitSize / 2, y + unitSize / 2, unitSize * 0.42);
+            var cx = xL + gap + col * (unitSize + gap) + unitSize/2;
+            drawUnit(cx, y + rowH/2, unitSize * 0.42);
         }
     }
 }
 
-// ==========================================
-// HASBA GRID: fill rectangle with zellige star + interstice
-// ==========================================
-function hasbaGrid(x, y, w, h, tileSize) {
-    var cols = Math.floor(w / tileSize);
-    var rows = Math.floor(h / tileSize);
-    var offX = x + (w - cols * tileSize) / 2;
-    var offY = y + (h - rows * tileSize) / 2;
-    for (var row = 0; row <= rows; row++) {
-        for (var col = 0; col <= cols; col++) {
-            var cx = offX + col * tileSize;
-            var cy = offY + row * tileSize;
-            if (cx >= x - 2 && cx <= x + w + 2 && cy >= y - 2 && cy <= y + h + 2) {
-                // Star at grid intersections
-                zelligeStar16(cx, cy, tileSize * 0.42);
-                // Interstice at grid cell centers
-                if (col < cols && row < rows) {
-                    intersticeX(cx + tileSize / 2, cy + tileSize / 2, tileSize * 0.3);
-                }
-                // Diamond between stars along edges
-                if (col < cols) {
-                    intersticeDiamond(cx + tileSize / 2, cy, tileSize * 0.25);
-                }
-                if (row < rows) {
-                    intersticeDiamond(cx, cy + tileSize / 2, tileSize * 0.25);
-                }
+// Fill rectangle with 2-level self-similar Hasba grid
+function hasbaGridSelfSimilar(x, y, w, h, primarySize) {
+    var secondarySize = primarySize * PHI_INV; // φ smaller
+    var cols1 = Math.floor(w / primarySize);
+    var rows1 = Math.floor(h / primarySize);
+    var offX = x + (w - cols1*primarySize)/2;
+    var offY = y + (h - rows1*primarySize)/2;
+
+    // Level 1: primary 16-fold stars at grid intersections
+    push(); stroke(192,57,43,130); strokeWeight(0.7); noFill();
+    for (var row = 0; row <= rows1; row++) {
+        for (var col = 0; col <= cols1; col++) {
+            var cx = offX + col*primarySize;
+            var cy = offY + row*primarySize;
+            if (cx >= x-2 && cx <= x+w+2 && cy >= y-2 && cy <= y+h+2) {
+                star16(cx, cy, primarySize * 0.42);
             }
         }
     }
+    pop();
+
+    // Level 2: secondary 8-fold stars at cell centers + interstices
+    push(); stroke(192,57,43,80); strokeWeight(0.4); noFill();
+    for (var row = 0; row < rows1; row++) {
+        for (var col = 0; col < cols1; col++) {
+            var cx = offX + col*primarySize + primarySize/2;
+            var cy = offY + row*primarySize + primarySize/2;
+            if (cx >= x && cx <= x+w && cy >= y && cy <= y+h) {
+                // 8-fold star at center (φ⁻¹ scale)
+                star8(cx, cy, secondarySize * 0.38);
+                // 4 kites pointing toward the primary stars
+                for (var k = 0; k < 4; k++) {
+                    var ka = k * HALF_PI;
+                    kite(cx + primarySize*0.28*Math.cos(ka), cy + primarySize*0.28*Math.sin(ka),
+                         secondarySize*0.6, ka);
+                }
+            }
+            // Edge diamonds (between primary stars)
+            if (col < cols1) diamond(cx, offY + row*primarySize, secondarySize*0.5);
+            if (row < rows1) diamond(offX + col*primarySize, cy, secondarySize*0.5);
+        }
+    }
+    pop();
+
+    // Level 3: tiny cross interstices at tertiary positions (φ⁻² scale)
+    push(); stroke(192,57,43,50); strokeWeight(0.3); noFill();
+    var tertiarySize = primarySize * PHI_INV2;
+    for (var row = 0; row < rows1; row++) {
+        for (var col = 0; col < cols1; col++) {
+            var cx = offX + col*primarySize;
+            var cy = offY + row*primarySize;
+            // Crosses at quarter-points
+            crossX(cx + primarySize*0.25, cy + primarySize*0.25, tertiarySize);
+            crossX(cx + primarySize*0.75, cy + primarySize*0.25, tertiarySize);
+            crossX(cx + primarySize*0.25, cy + primarySize*0.75, tertiarySize);
+            crossX(cx + primarySize*0.75, cy + primarySize*0.75, tertiarySize);
+        }
+    }
+    pop();
 }
 
-// ==========================================
+// ============================================================
 // GEOMETRY HELPERS
-// ==========================================
-function fitCircle3(p1, p2, p3) {
+// ============================================================
+function fitCircle3(p1,p2,p3){
     var ax=p1[0],ay=p1[1],bx=p2[0],by=p2[1],cx=p3[0],cy=p3[1];
     var D=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
-    if(Math.abs(D)<0.01) return null;
+    if(Math.abs(D)<0.01)return null;
     var ux=((ax*ax+ay*ay)*(by-cy)+(bx*bx+by*by)*(cy-ay)+(cx*cx+cy*cy)*(ay-by))/D;
     var uy=((ax*ax+ay*ay)*(cx-bx)+(bx*bx+by*by)*(ax-cx)+(cx*cx+cy*cy)*(bx-ax))/D;
-    return {cx:ux, cy:uy, r:Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy))};
+    return{cx:ux,cy:uy,r:Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy))};
 }
-
-function drawArc3(p1, p2, p3) {
-    var c=fitCircle3(p1,p2,p3); if(!c) return c;
+function drawArc3(p1,p2,p3){
+    var c=fitCircle3(p1,p2,p3);if(!c)return c;
     var a1=Math.atan2(p1[1]-c.cy,p1[0]-c.cx);
     var a2=Math.atan2(p2[1]-c.cy,p2[0]-c.cx);
     var a3=Math.atan2(p3[1]-c.cy,p3[0]-c.cx);
     var d12=a2-a1,d13=a3-a1;
-    while(d12>Math.PI)d12-=TAU; while(d12<-Math.PI)d12+=TAU;
-    while(d13>Math.PI)d13-=TAU; while(d13<-Math.PI)d13+=TAU;
+    while(d12>Math.PI)d12-=TAU;while(d12<-Math.PI)d12+=TAU;
+    while(d13>Math.PI)d13-=TAU;while(d13<-Math.PI)d13+=TAU;
     var sw=d13;
-    if(d12*d13<0||(Math.abs(d12)>Math.abs(d13))) sw=d13>0?d13-TAU:d13+TAU;
+    if(d12*d13<0||(Math.abs(d12)>Math.abs(d13)))sw=d13>0?d13-TAU:d13+TAU;
     beginShape();
     for(var i=0;i<=60;i++){var t=i/60;var a=a1+sw*t;vertex(c.cx+c.r*Math.cos(a),c.cy+c.r*Math.sin(a));}
     endShape();
     return c;
 }
-
-function drawArc2(p1, p3, off) {
-    var mx=(p1[0]+p3[0])/2+off, my=(p1[1]+p3[1])/2;
+function drawArc2(p1,p3,off){
+    var mx=(p1[0]+p3[0])/2+off,my=(p1[1]+p3[1])/2;
     drawArc3(p1,[mx,my],p3);
 }
 
-// ==========================================
+// ============================================================
 // MAIN
-// ==========================================
+// ============================================================
 function setup() {
     createCanvas(W, H, WEBGL);
     pixelDensity(1);
@@ -244,108 +277,146 @@ function draw() {
         OtL:[43,670], OtR:[731,670], ItL:[88,658], ItR:[686,658]
     };
 
-    // ========== PATTERN FILLS (drawn first, structure on top) ==========
+    // ========== 1. PATTERN FILLS (drawn first, structure overlays) ==========
 
-    // --- Door panels: Hasba grid with 16-fold zellige stars ---
-    push();
-    stroke(192, 57, 43, 100); strokeWeight(0.6); noFill();
-    // Upper panels (largest tiles)
-    hasbaGrid(95, 665, 280, 210, 52);
-    hasbaGrid(390, 665, 290, 210, 52);
-    // Middle panels
-    hasbaGrid(95, 888, 280, 155, 44);
-    hasbaGrid(390, 888, 290, 155, 44);
-    // Lower panels
-    hasbaGrid(95, 1055, 280, 160, 40);
-    hasbaGrid(390, 1055, 290, 160, 40);
-    pop();
+    // --- Door panels: 2-level self-similar Hasba grid ---
+    // Upper panels (φ-scaled: primary=60, secondary=37, tertiary=23)
+    hasbaGridSelfSimilar(95, 665, 280, 210, 60);
+    hasbaGridSelfSimilar(390, 665, 290, 210, 60);
+    // Middle panels (slightly smaller primary, denser feel)
+    hasbaGridSelfSimilar(95, 888, 280, 155, 50);
+    hasbaGridSelfSimilar(390, 888, 290, 155, 50);
+    // Lower panels (densest)
+    hasbaGridSelfSimilar(95, 1055, 280, 160, 44);
+    hasbaGridSelfSimilar(390, 1055, 290, 160, 44);
 
-    // --- Arch zone: Pretext-style rosettes flowing along arch width ---
+    // --- Arch zone: 12-fold shamsa rosettes via pretextFill ---
     var archCircle = fitCircle3(p.IhL, p.IwL, p.IA);
+    var outerCircle = fitCircle3(p.OhL, p.OwL, p.OA);
     if (archCircle) {
-        push();
-        stroke(192, 57, 43, 80); strokeWeight(0.4); noFill();
+        // Inner arch fill: shamsa rosettes adapting to arch width
+        push(); stroke(192,57,43,70); strokeWeight(0.45); noFill();
         pretextFill(
             function(y) {
                 var dy = y - archCircle.cy;
                 if (Math.abs(dy) >= archCircle.r) return null;
-                var dx = Math.sqrt(archCircle.r * archCircle.r - dy * dy);
-                var xL = archCircle.cx - dx + 15;
-                var xR = 774 - archCircle.cx + archCircle.cx + dx - 15;
-                // Symmetric: mirror around 387
-                xR = 387 + (387 - xL);
-                if (xR - xL < 30) return null;
-                return [xL, xR];
+                var dx = Math.sqrt(archCircle.r*archCircle.r - dy*dy);
+                var xL = archCircle.cx - dx + 12;
+                var xR = 387 + (387 - xL);
+                return (xR-xL > 35) ? [xL, xR] : null;
             },
-            140, 630, 28, rosette8
+            135, 625, 32, star12
         );
         pop();
 
-        // Concentric band arcs inside the arch (3 bands)
-        push();
-        stroke(192, 57, 43, 60); strokeWeight(0.5); noFill();
-        for (var band = 0; band < 3; band++) {
-            var br = archCircle.r - 30 - band * 25;
-            if (br < 50) continue;
-            beginShape();
-            for (var i = 0; i <= 40; i++) {
-                var t = i / 40;
-                var a = -Math.PI * 0.85 + t * Math.PI * 0.7;
-                vertex(archCircle.cx + br * Math.cos(a), archCircle.cy + br * Math.sin(a));
-            }
-            endShape();
-        }
+        // Secondary scale: tiny 6-fold stars in arch (φ⁻¹ of 32 = 20)
+        push(); stroke(192,57,43,45); strokeWeight(0.3); noFill();
+        pretextFill(
+            function(y) {
+                var dy = y - archCircle.cy;
+                if (Math.abs(dy) >= archCircle.r) return null;
+                var dx = Math.sqrt(archCircle.r*archCircle.r - dy*dy);
+                var xL = archCircle.cx - dx + 8;
+                var xR = 387 + (387 - xL);
+                return (xR-xL > 22) ? [xL, xR] : null;
+            },
+            150, 620, 20, star6
+        );
         pop();
+
+        // Concentric decorative bands between inner and outer arch
+        if (outerCircle) {
+            push(); stroke(192,57,43,55); strokeWeight(0.5); noFill();
+            for (var band = 0; band < 4; band++) {
+                var br = archCircle.r + 8 + band * 12;
+                if (br > outerCircle.r - 5) break;
+                beginShape();
+                for (var i = 0; i <= 50; i++) {
+                    var t = i/50;
+                    // Sweep from left HS to right HS through apex
+                    var a = -PI*0.82 + t*PI*0.64;
+                    vertex(archCircle.cx + br*Math.cos(a), archCircle.cy + br*Math.sin(a));
+                }
+                endShape();
+            }
+            // Diamonds along middle band
+            strokeWeight(0.35);
+            var midBandR = archCircle.r + 8 + 18;
+            for (var i = 0; i <= 16; i++) {
+                var t = i/16;
+                var a = -PI*0.82 + t*PI*0.64;
+                diamond(archCircle.cx + midBandR*Math.cos(a), archCircle.cy + midBandR*Math.sin(a), 8);
+            }
+            pop();
+        }
     }
 
-    // --- Spandrels: 6-fold stars + interlace in triangular zones ---
-    push();
-    stroke(192, 57, 43, 90); strokeWeight(0.5); noFill();
-    // Left spandrel (triangle: top-left frame corner → arch shoulder)
-    var spandrelUnits = [
-        [55, 120, 14], [55, 160, 12], [55, 200, 12],
-        [55, 240, 10], [55, 280, 10], [55, 320, 10],
-        [90, 140, 12], [90, 180, 12], [90, 220, 10],
-        [90, 260, 10], [125, 160, 10], [125, 200, 10],
-    ];
-    for (var i = 0; i < spandrelUnits.length; i++) {
-        var su = spandrelUnits[i];
-        star6(su[0], su[1], su[2]);
-        // Mirror right
-        star6(774 - su[0], su[1], su[2]);
+    // --- Spandrels: 6-fold stars at 3 scales (self-similar) + interlace ---
+    push(); stroke(192,57,43,85); noFill();
+    // Spandrel = triangular zone: frame corner to arch shoulder
+    // Level 1: large 6-fold stars (φ⁰ = 18px radius)
+    var spL1 = [[55,110],[55,180],[55,260],[55,340],[55,420],
+                [90,140],[90,220],[90,300],[90,380]];
+    strokeWeight(0.55);
+    for (var i = 0; i < spL1.length; i++) {
+        star6(spL1[i][0], spL1[i][1], 18);
+        star6(774-spL1[i][0], spL1[i][1], 18); // mirror
+    }
+    // Level 2: medium stars (φ⁻¹ = 11px) — fill gaps
+    var spL2 = [[55,145],[55,215],[55,295],[55,380],
+                [90,170],[90,250],[90,340],
+                [120,190],[120,270]];
+    strokeWeight(0.4);
+    for (var i = 0; i < spL2.length; i++) {
+        star6(spL2[i][0], spL2[i][1], 11);
+        star6(774-spL2[i][0], spL2[i][1], 11);
+    }
+    // Level 3: tiny diamonds (φ⁻² = 7px) — horror vacui
+    strokeWeight(0.3);
+    for (var i = 0; i < spL1.length; i++) {
+        diamond(spL1[i][0]+20, spL1[i][1], 7);
+        diamond(774-spL1[i][0]-20, spL1[i][1], 7);
     }
     // Interlace bands in spandrels
-    strokeWeight(0.7);
-    interlaceBand(35, 80, 60, 450, 8, 5);
-    interlaceBand(50, 80, 75, 450, 6, 7);
-    interlaceBand(774-35, 80, 774-60, 450, 8, 5);
-    interlaceBand(774-50, 80, 774-75, 450, 6, 7);
+    strokeWeight(0.6);
+    interlace(35, 75, 65, 460, 9, 6);
+    interlace(774-35, 75, 774-65, 460, 9, 6);
     pop();
 
-    // --- Border decoration between frame and arch legs ---
-    push();
-    stroke(192, 57, 43, 70); strokeWeight(0.4); noFill();
-    // Left border strip (between x=43 and x=88)
-    for (var y = 680; y < 1240; y += 20) {
-        intersticeDiamond(65, y, 12);
-    }
-    // Right border strip
-    for (var y = 680; y < 1240; y += 20) {
-        intersticeDiamond(709, y, 12);
+    // --- Border strips: diamond + cross chain between legs ---
+    push(); stroke(192,57,43,65); strokeWeight(0.35); noFill();
+    for (var y = 680; y < 1230; y += 18) {
+        diamond(65, y, 10);
+        diamond(709, y, 10);
+        if ((y-680) % 36 < 18) {
+            crossX(65, y+9, 6);
+            crossX(709, y+9, 6);
+        }
     }
     pop();
 
-    // ========== STRUCTURAL DRAWING (on top) ==========
+    // --- Door center line decoration: chain of alternating shapes ---
+    push(); stroke(192,57,43,55); strokeWeight(0.3); noFill();
+    for (var y = 665; y < 1210; y += 22) {
+        if ((y-665) % 44 < 22) {
+            diamond(387, y+11, 8);
+        } else {
+            crossX(387, y+11, 5);
+        }
+    }
+    pop();
+
+    // ========== 2. STRUCTURAL DRAWING (on top) ==========
 
     // Main arcs
-    stroke(192, 57, 43); strokeWeight(3); noFill();
-    drawArc3(p.OhL, p.OwL, p.OA); drawArc3(p.OA, p.OwR, p.OhR);
-    drawArc3(p.IhL, p.IwL, p.IA); drawArc3(p.IA, p.IwR, p.IhR);
+    stroke(192,57,43); strokeWeight(3); noFill();
+    drawArc3(p.OhL,p.OwL,p.OA); drawArc3(p.OA,p.OwR,p.OhR);
+    drawArc3(p.IhL,p.IwL,p.IA); drawArc3(p.IA,p.IwR,p.IhR);
 
     // Pinch arcs
     strokeWeight(2);
-    drawArc2(p.OhL, p.OpL, -6); drawArc2(p.OhR, p.OpR, 6);
-    drawArc2(p.IhL, p.IpL, -5); drawArc2(p.IhR, p.IpR, 5);
+    drawArc2(p.OhL,p.OpL,-6); drawArc2(p.OhR,p.OpR,6);
+    drawArc2(p.IhL,p.IpL,-5); drawArc2(p.IhR,p.IpR,5);
 
     // Legs
     strokeWeight(3);
@@ -356,29 +427,45 @@ function draw() {
 
     // Outer frame
     strokeWeight(4);
-    line(27,50,27,1244); line(747,50,747,1244); line(27,1244,747,1244);
-    line(27,50,747,50);
+    line(27,50,27,1244); line(747,50,747,1244); line(27,1244,747,1244); line(27,50,747,50);
 
     // Door divisions
-    strokeWeight(2);
+    strokeWeight(2.5);
     line(387,122,387,1218);
+    strokeWeight(2);
     line(88,658,686,658);
     line(88,881,686,881); line(88,1049,686,1049); line(88,1218,686,1218);
 
     // Threshold
+    strokeWeight(2);
     line(27,1265,747,1265);
 
-    // Door knockers (paired, centered on each door leaf)
+    // Door knockers (paired, golden ratio positioned on each leaf)
+    // Knocker Y: 770 ≈ 658 + (881-658)*PHI_INV = 658 + 138 = 796 → use 790
     strokeWeight(1.5);
-    var knockers = [237, 537];
+    var knockerY = 658 + Math.round((881-658)*PHI_INV);
+    var knockers = [
+        88 + Math.round((387-88)/2),   // left leaf center = 237
+        387 + Math.round((686-387)/2)   // right leaf center = 537
+    ];
     for (var k = 0; k < 2; k++) {
-        var kx = knockers[k], ky = 770;
-        ellipse(kx, ky, 30, 30);
-        ellipse(kx, ky, 50, 50);
-        for (var i = 0; i < 8; i++) {
-            var a = i * Math.PI / 4;
-            line(kx+15*Math.cos(a), ky+15*Math.sin(a), kx+25*Math.cos(a), ky+25*Math.sin(a));
+        var kx = knockers[k], ky = knockerY;
+        // Outer ring with 16 radial marks
+        ellipse(kx, ky, 46, 46);
+        ellipse(kx, ky, 28, 28);
+        strokeWeight(1);
+        for (var i = 0; i < 16; i++) {
+            var a = (i/16)*TAU;
+            line(kx+14*Math.cos(a), ky+14*Math.sin(a), kx+23*Math.cos(a), ky+23*Math.sin(a));
         }
+        // Hanging ring (semi-circle below)
+        beginShape();
+        for (var i = 0; i <= 20; i++) {
+            var a = i/20 * PI;
+            vertex(kx + 10*Math.cos(a), ky + 8 + 10*Math.sin(a));
+        }
+        endShape();
+        strokeWeight(1.5);
     }
 }
 </script>
