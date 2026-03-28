@@ -305,3 +305,146 @@ TRACED geometry (arcs/lines) → Pretext text layout along geometry → p5.brush
 
 ### Connection to fatiha.app
 Voice recitation → Pretext layouts text along TRACED geometric paths → p5.brush renders calligraphic strokes progressively
+
+## Islamic Pattern Fill — Hasba Method (Added 2026-03-28)
+
+### The Hasba Method (Moroccan Zellige Construction)
+1. **Central rosette** — n-fold star (8, 12, 16-fold). The seed shape.
+2. **Regulation grid** — determines how rosettes tile/connect. Grid spacing = rosette diameter.
+3. **Interstice shapes** — fill gaps between stars: crosses, diamonds, smaller stars, kite shapes.
+4. **Line hierarchy** — structural lines heaviest, pattern lines lightest.
+
+### Pattern Vocabulary
+- `zelligeStar16(cx, cy, r)` — 16-fold star with inner regulation circle + spokes
+- `rosette8(cx, cy, r)` — 8-fold star with petal arcs + inner circle
+- `star6(cx, cy, r)` — 6-fold (two overlapping triangles, Star of David form)
+- `intersticeX(cx, cy, s)` — cross-shaped gap filler (4 arms)
+- `intersticeDiamond(cx, cy, s)` — diamond/lozenge gap filler
+- `interlaceBand(x1,y1,x2,y2,amp,periods)` — serpentine wave between two points
+
+### Pretext-Style Fill (pretextFill)
+The key composition function. Fills ANY shape by scanning row-by-row:
+```js
+pretextFill(getWidth, yStart, yEnd, unitSize, drawUnit)
+// getWidth(y) → [xLeft, xRight] or null
+// Fits floor(rowWidth/unitSize) units per row, centered
+```
+This is the Pretext concept applied to geometry: just as text flows into variable-width lines,
+pattern units flow into variable-width shape regions.
+
+### Golden Ratio Sizing (v2+)
+- Primary tile: `size`
+- Secondary: `size / φ` (0.618×)
+- Tertiary: `size / φ²` (0.382×)
+- Quaternary: `size / φ³` (0.236×)
+Creates natural visual hierarchy matching Islamic mathematical tradition.
+
+### Composition Principles (Islamic Art)
+- **Horror vacui**: fill all space — no empty zones
+- **Self-similarity**: same patterns at multiple scales
+- **Symmetry**: bilateral (doors) + rotational (rosettes)
+- **Hierarchy**: largest patterns dominate, smaller fill gaps
+- **Rhythm**: alternating pattern types across zones
+- **Graded density**: denser patterns in higher-focus areas
+
+### p5.js WEBGL Constraints (HARD-WON)
+- **p5.brush requires WEBGL** — cannot use 2D mode
+- **No `quadraticVertex()`** — manual bezier: `bx=(1-t)²*sx + 2(1-t)*t*mx + t²*ex`
+- **No raw canvas context** — `drawingContext.beginPath()` draws nothing in WEBGL
+- **`TAU` is predefined** — do NOT declare `var TAU`
+- **Use `beginShape()/vertex()/endShape()`** for all curves and polygons
+
+### Reference
+- **Zouaq Pattern Generator**: github.com/volumique/zouaq-pattern-generator
+  - Hasba method implementation, 17 wallpaper groups
+  - Pattern types: zellige, zouaq strapwork, rosettes, fractals, mandalas, shamsa, tawriq, tastir, amazigh
+  - Architecture: PatternConfig → normalizeConfig → generateTileShapes → generatePattern → SVG
+
+### Lesson 23: Pixel counts alone aren't verification
+Counting "reddish" pixels with loose thresholds (R>G) catches warm-toned backgrounds, not actual drawing.
+Use strict threshold: `(R > G+15) & (R > B+15)` for distinctly red content.
+Also check: zone distribution, component count, transitions per row, JS error count, frameCount.
+"41K reddish pixels" was 100% background. "64K distinctly red pixels" was real.
+
+### Lesson 24: Rewrite > patch when accumulated edits break a file
+Multiple sed/python patches create cascading syntax errors (stripped comments, broken tokens).
+When >3 patches fail, use Write tool to rewrite the entire file clean from scratch.
+
+### TRACED Verification Checklist (pattern fills)
+1. `node --check` — zero syntax errors
+2. dev-browser errors array — zero JS errors
+3. `frameCount > 0` — draw() actually ran
+4. Strict red pixel count > 20K
+5. Per-zone distribution (spandrels, arch, panels, borders)
+6. Component count per zone (patterns = many small components)
+7. Transitions per row (patterns = high, plain lines = low)
+
+## Girih Tiles — Islamic Quasicrystal Pattern System (Added 2026-03-28)
+
+### The Discovery
+Lu & Steinhardt (2007, Science) showed that Islamic artisans at the Darb-i Imam shrine in Isfahan (1453)
+created quasicrystal patterns matching Penrose tilings — 500 years before Western mathematics.
+
+### The 5 Girih Tiles
+All edges equal length. All angles = n×36° (π/5). This is the "girih quantum."
+
+| Tile | Persian Name | Sides | Angles |
+|------|-------------|-------|--------|
+| Regular decagon | Tabl | 10 | 144° |
+| Elongated hexagon | Shesh Band | 6 | [72°, 144°, 144°] ×2 |
+| Bowtie (non-convex) | Sormeh Dan | 6 | [72°, 72°, 216°] ×2 |
+| Golden rhombus | Torange | 4 | [72°, 108°] ×2 |
+| Regular pentagon | Pange | 5 | 108° |
+
+### Strapwork (Girih Lines) — What You Actually See
+- Lines cross each tile edge at **54° (3π/10)** from the edge
+- Two lines cross each edge
+- Lines are straight, may have one sharp bend (at multiples of 36°)
+- The tile boundaries are HIDDEN — only the strapwork is visible
+- This is pure ruler-and-compass: consistent with TRACED philosophy
+
+### The Golden Ratio Connection
+- Pentagon diagonal/side = φ = (1+√5)/2
+- Decagon inherits φ from its pentagonal subdivision
+- Rhombus angles (72°/108°) are the golden gnomon angles
+- φ-scaling between tile levels creates self-similar quasicrystal
+
+### Mathematical Constants (girih.js)
+```
+A36 = π/5       // The quantum angle
+A72 = 2π/5      // Pentagon interior supplement
+A54 = 3π/10     // Strapwork crossing angle
+PHI = (1+√5)/2  // Golden ratio (embedded in all 5 tiles)
+SIN36, COS36, SIN72, COS72  // Precomputed
+```
+
+### Strapwork Construction Algorithm
+For each tile:
+1. Find midpoints of all edges
+2. Connect midpoints that are N edges apart (N depends on tile type):
+   - Decagon: connect midpoints 3 apart → {10/3} star polygon
+   - Pentagon: connect midpoints 2 apart → pentagram
+   - Rhombus: connect opposite edge midpoints → X pattern
+   - Hexagon/Bowtie: connect midpoints 2 apart → zigzag
+3. The resulting line network IS the visible pattern
+
+### Multi-Scale Composition
+Self-similar at exactly 2 levels (traditional):
+- Level 1: Large decagons at grid intersections
+- Level 2: Pentagons filling gaps (φ⁻¹ scale)
+- Level 3: Rhombi + bowties in remaining gaps (φ⁻² scale)
+
+For 3+ levels, each large tile subdivides into smaller tiles of the same 5 types
+(the Darb-i Imam substitution rules).
+
+### Integration with pretextFill
+Girih tiles adapt to variable-width containers naturally:
+- `pretextFill(archWidth, yStart, yEnd, tileSize, girihPentagon)` — pentagons flow along arch
+- Staggered rows create quasicrystal feel (offset every other row by tileSize/2)
+
+### References
+- Lu & Steinhardt, "Decagonal and Quasi-Crystalline Tilings in Medieval Islamic Architecture" (Science, 2007)
+- Bonner, "Islamic Geometric Patterns" (Springer, 2017)
+- Eriksson, "Extended Girih Tiles" (Bridges 2020)
+- Darb-i Imam shrine, Isfahan, Iran (1453)
+- Topkapi Scroll (15th century) — pattern template scroll
