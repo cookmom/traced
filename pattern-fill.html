@@ -42,9 +42,10 @@ function regularPoly(cx, cy, r, n, rot) {
 
 // Draw polygon from point array
 function drawPoly(pts) {
-    beginShape();
-    for (var i = 0; i < pts.length; i++) vertex(pts[i][0], pts[i][1]);
-    endShape(CLOSE);
+    for (var i = 0; i < pts.length; i++) {
+        var j = (i+1) % pts.length;
+        line(pts[i][0], pts[i][1], pts[j][0], pts[j][1]);
+    }
 }
 
 // Midpoint of an edge
@@ -71,12 +72,12 @@ function strapPoint(p1, p2, inward) {
 function girihDecagon(cx, cy, r) {
     var pts = regularPoly(cx, cy, r, 10, -HALF_PI);
     // Tile boundary (faint)
-    push(); stroke(192,57,43,30); strokeWeight(0.3);
+    push(); noFill(); stroke(192,57,43,30); strokeWeight(0.3);
     drawPoly(pts);
     pop();
     // Strapwork: each edge midpoint connects to midpoints 2 edges away
     // creating a {10/3} star polygon (the girih pattern)
-    push(); stroke(192,57,43,140); strokeWeight(1.0);
+    push(); noFill(); stroke(192,57,43,140); strokeWeight(0.5);
     for (var i = 0; i < 10; i++) {
         var m1 = edgeMid(pts[i], pts[(i+1)%10]);
         var m2 = edgeMid(pts[(i+3)%10], pts[(i+4)%10]);
@@ -84,7 +85,7 @@ function girihDecagon(cx, cy, r) {
     }
     pop();
     // Inner decagon from strapwork intersections
-    push(); stroke(192,57,43,80); strokeWeight(0.5);
+    push(); noFill(); stroke(192,57,43,80); strokeWeight(0.5);
     var inner = regularPoly(cx, cy, r*0.38, 10, -HALF_PI + A36/2);
     drawPoly(inner);
     pop();
@@ -93,11 +94,11 @@ function girihDecagon(cx, cy, r) {
 // Pentagon strapwork: 5 edges → pentagram
 function girihPentagon(cx, cy, r) {
     var pts = regularPoly(cx, cy, r, 5, -HALF_PI);
-    push(); stroke(192,57,43,25); strokeWeight(0.2);
+    push(); noFill(); stroke(192,57,43,25); strokeWeight(0.2);
     drawPoly(pts);
     pop();
     // Pentagram: connect each midpoint to midpoint 2 edges away
-    push(); stroke(192,57,43,120); strokeWeight(0.8);
+    push(); noFill(); stroke(192,57,43,120); strokeWeight(0.55);
     for (var i = 0; i < 5; i++) {
         var m1 = edgeMid(pts[i], pts[(i+1)%5]);
         var m2 = edgeMid(pts[(i+2)%5], pts[(i+3)%5]);
@@ -105,7 +106,7 @@ function girihPentagon(cx, cy, r) {
     }
     pop();
     // Inner pentagon
-    push(); stroke(192,57,43,60); strokeWeight(0.4);
+    push(); noFill(); stroke(192,57,43,60); strokeWeight(0.4);
     var inner = regularPoly(cx, cy, r*0.38, 5, -HALF_PI + A36);
     drawPoly(inner);
     pop();
@@ -125,11 +126,11 @@ function girihRhombus(cx, cy, s, angle) {
         [cx - s*0.5*ca, cy - s*0.5*sa],
         [cx - s*0.38*pa, cy - s*0.38*pb]
     ];
-    push(); stroke(192,57,43,25); strokeWeight(0.2);
+    push(); noFill(); stroke(192,57,43,25); strokeWeight(0.2);
     drawPoly(pts);
     pop();
     // Strapwork: X through center
-    push(); stroke(192,57,43,110); strokeWeight(0.7);
+    push(); noFill(); stroke(192,57,43,110); strokeWeight(0.5);
     var m01 = edgeMid(pts[0],pts[1]), m12 = edgeMid(pts[1],pts[2]);
     var m23 = edgeMid(pts[2],pts[3]), m30 = edgeMid(pts[3],pts[0]);
     line(m01[0],m01[1],m23[0],m23[1]);
@@ -149,11 +150,11 @@ function girihBowtie(cx, cy, r, angle) {
         var rr = (i === 2 || i === 5) ? r*0.38 : r; // waist vertices closer
         pts.push([cx + rr*Math.cos(aa), cy + rr*Math.sin(aa)]);
     }
-    push(); stroke(192,57,43,25); strokeWeight(0.2);
+    push(); noFill(); stroke(192,57,43,25); strokeWeight(0.2);
     drawPoly(pts);
     pop();
     // Strapwork: zigzag through center
-    push(); stroke(192,57,43,100); strokeWeight(0.6);
+    push(); noFill(); stroke(192,57,43,100); strokeWeight(0.6);
     for (var i = 0; i < 6; i++) {
         var m = edgeMid(pts[i], pts[(i+1)%6]);
         var m2 = edgeMid(pts[(i+1)%6], pts[(i+2)%6]);
@@ -172,11 +173,11 @@ function girihHexagon(cx, cy, r, angle) {
         var aa = a + cumAngles[i]*Math.PI/180;
         pts.push([cx + r*Math.cos(aa), cy + r*Math.sin(aa)]);
     }
-    push(); stroke(192,57,43,25); strokeWeight(0.2);
+    push(); noFill(); stroke(192,57,43,25); strokeWeight(0.2);
     drawPoly(pts);
     pop();
     // Strapwork: parallel zigzag
-    push(); stroke(192,57,43,100); strokeWeight(0.6);
+    push(); noFill(); stroke(192,57,43,100); strokeWeight(0.6);
     for (var i = 0; i < 6; i++) {
         var m = edgeMid(pts[i], pts[(i+1)%6]);
         var m2 = edgeMid(pts[(i+2)%6], pts[(i+3)%6]);
@@ -201,7 +202,7 @@ function pretextFill(getWidth, yStart, yEnd, unitSize, drawUnit) {
         var rowShift = (Math.floor((y-yStart)/unitSize) % 2) * unitSize * 0.5;
         for (var col = 0; col < cols; col++) {
             var cx = xL + gap + col*(unitSize+gap) + unitSize/2 + rowShift;
-            if (cx > xL && cx < xR) {
+            if (cx > xL + unitSize*0.5 && cx < xR - unitSize*0.5) {
                 drawUnit(cx, y + unitSize/2, unitSize*0.42);
             }
         }
@@ -225,7 +226,7 @@ function girihMultiScale(x, y, w, h, primarySize) {
             var cy = oy + row*primarySize;
             // Stagger every other row
             if (row % 2 === 1) cx += primarySize/2;
-            if (cx > x-5 && cx < x+w+5 && cy > y-5 && cy < y+h+5) {
+            if (cx > x+primarySize*0.5 && cx < x+w-primarySize*0.5 && cy > y+primarySize*0.5 && cy < y+h-primarySize*0.5) {
                 girihDecagon(cx, cy, primarySize*0.44);
             }
         }
@@ -237,7 +238,7 @@ function girihMultiScale(x, y, w, h, primarySize) {
             var cx = ox + col*primarySize + primarySize/2;
             var cy = oy + row*primarySize + primarySize/2;
             if (row % 2 === 1) cx += primarySize/2;
-            if (cx > x && cx < x+w && cy > y && cy < y+h) {
+            if (cx > x+secSize*0.5 && cx < x+w-secSize*0.5 && cy > y+secSize*0.5 && cy < y+h-secSize*0.5) {
                 girihPentagon(cx, cy, secSize*0.4);
             }
         }
@@ -249,7 +250,7 @@ function girihMultiScale(x, y, w, h, primarySize) {
             var cx = ox + col*primarySize + primarySize*0.25;
             var cy = oy + row*primarySize + primarySize*0.25;
             if (row % 2 === 1) cx += primarySize/2;
-            if (cx > x && cx < x+w && cy > y && cy < y+h) {
+            if (cx > x+terSize*0.6 && cx < x+w-terSize*0.6 && cy > y+terSize*0.6 && cy < y+h-terSize*0.6) {
                 girihRhombus(cx, cy, terSize*0.8, col*A36);
             }
             // Bowties at opposite quarter-points
@@ -319,14 +320,14 @@ function draw() {
 
     // Door panels: girih multi-scale (decagons → pentagons → rhombi)
     // Upper panels (largest: primary=70 → 43 → 27)
-    girihMultiScale(95, 668, 280, 206, 70);
-    girihMultiScale(392, 668, 288, 206, 70);
+    girihMultiScale(95, 668, 280, 206, 85);
+    girihMultiScale(392, 668, 288, 206, 85);
     // Middle panels
-    girihMultiScale(95, 888, 280, 155, 58);
-    girihMultiScale(392, 888, 288, 155, 58);
+    girihMultiScale(95, 888, 280, 155, 72);
+    girihMultiScale(392, 888, 288, 155, 72);
     // Lower panels (densest)
-    girihMultiScale(95, 1055, 280, 158, 50);
-    girihMultiScale(392, 1055, 288, 158, 50);
+    girihMultiScale(95, 1055, 280, 158, 62);
+    girihMultiScale(392, 1055, 288, 158, 62);
 
     // Arch zone: pentagons via pretextFill (adapting to arch width)
     var archC = fitCircle3(p.IhL, p.IwL, p.IA);
@@ -340,7 +341,7 @@ function draw() {
                 var xR = 387 + (387-xL);
                 return (xR-xL > 30) ? [xL, xR] : null;
             },
-            130, 630, 36, function(cx,cy,r) { girihPentagon(cx,cy,r); }
+            140, 620, 44, function(cx,cy,r) { girihPentagon(cx,cy,r); }
         );
 
         // Secondary: tiny decagons in arch at φ⁻¹ scale
@@ -353,7 +354,7 @@ function draw() {
                 var xR = 387 + (387-xL);
                 return (xR-xL > 22) ? [xL, xR] : null;
             },
-            145, 620, 22, function(cx,cy,r) { girihDecagon(cx,cy,r*0.9); }
+            155, 610, 28, function(cx,cy,r) { girihDecagon(cx,cy,r*0.9); }
         );
     }
 
