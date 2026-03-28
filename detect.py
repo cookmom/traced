@@ -102,11 +102,12 @@ def fit_line_ransac(points, n_iter=500, threshold=2.0):
     projections = centered @ direction
     sorted_proj = np.sort(projections)
     
-    # Find the longest continuous dense run
+    # Dense-core endpoint trimming: find the longest continuous run of points
+    # Allow small gaps (up to 10px) for vertex junctions where lines cross
+    sorted_proj = np.sort(projections)
     gaps = np.diff(sorted_proj)
-    # Split at large gaps — use median gap * 5 as threshold (adapts to point density)
-    median_gap = np.median(gaps) if len(gaps) > 0 else 1.0
-    break_threshold = max(5.0, median_gap * 5)
+    break_threshold = 10.0  # vertex junctions create gaps ~5-8px in skeleton
+    
     segments = []
     seg_start = 0
     for i, g in enumerate(gaps):
