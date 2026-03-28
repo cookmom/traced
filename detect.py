@@ -102,10 +102,11 @@ def fit_line_ransac(points, n_iter=500, threshold=2.0):
     projections = centered @ direction
     sorted_proj = np.sort(projections)
     
-    # Find the longest continuous dense run (gap < 3px between consecutive points)
+    # Find the longest continuous dense run
     gaps = np.diff(sorted_proj)
-    # Split at large gaps (>3px = break in the stroke)
-    break_threshold = 3.0
+    # Split at large gaps — use median gap * 5 as threshold (adapts to point density)
+    median_gap = np.median(gaps) if len(gaps) > 0 else 1.0
+    break_threshold = max(5.0, median_gap * 5)
     segments = []
     seg_start = 0
     for i, g in enumerate(gaps):
