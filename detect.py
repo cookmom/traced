@@ -349,7 +349,7 @@ def _fit_blob(points, min_line_length=30):
     return None
 
 
-def detect_primitives(edge_points, image_shape, min_line_length=30):
+def detect_primitives(edge_points, image_shape, min_line_length=80):
     """Cluster edge pixels into blobs, fit primitives per blob."""
     H, W = image_shape
     blobs = _cluster_edges(edge_points, max_gap=4.0)
@@ -380,7 +380,7 @@ def detect_primitives(edge_points, image_shape, min_line_length=30):
     # Post-filter: remove tiny primitives (noise at junctions)
     filtered = []
     for p in primitives:
-        if p['type'] == 'arc' and p['n_inliers'] < 30:
+        if p['type'] == 'arc' and (p['n_inliers'] < 30 or p['params']['radius'] < 25):
             unexplained += p['n_inliers']
             continue
         if p['type'] == 'line' and p['n_inliers'] < 15:
@@ -401,24 +401,30 @@ def detect_primitives(edge_points, image_shape, min_line_length=30):
             best_dist = 15.0
             best_snap = None
             for j, q in enumerate(primitives):
-                if i == j or q['type'] != 'arc':
+                if i == j:
                     continue
                 qp = q['params']
                 import math as m
-                # Arc start point
-                sx = qp['cx'] + qp['radius'] * m.cos(qp['start_angle'])
-                sy = qp['cy'] + qp['radius'] * m.sin(qp['start_angle'])
-                d = m.sqrt((lx-sx)**2 + (ly-sy)**2)
-                if d < best_dist:
-                    best_dist = d
-                    best_snap = (sx, sy)
-                # Arc end point
-                ex = qp['cx'] + qp['radius'] * m.cos(qp['start_angle'] + qp['sweep'])
-                ey = qp['cy'] + qp['radius'] * m.sin(qp['start_angle'] + qp['sweep'])
-                d = m.sqrt((lx-ex)**2 + (ly-ey)**2)
-                if d < best_dist:
-                    best_dist = d
-                    best_snap = (ex, ey)
+                if q['type'] == 'arc':
+                    # Arc start point
+                    sx = qp['cx'] + qp['radius'] * m.cos(qp['start_angle'])
+                    sy = qp['cy'] + qp['radius'] * m.sin(qp['start_angle'])
+                    d = m.sqrt((lx-sx)**2 + (ly-sy)**2)
+                    if d < best_dist:
+                        best_dist = d; best_snap = (sx, sy)
+                    # Arc end point
+                    ex = qp['cx'] + qp['radius'] * m.cos(qp['start_angle'] + qp['sweep'])
+                    ey = qp['cy'] + qp['radius'] * m.sin(qp['start_angle'] + qp['sweep'])
+                    d = m.sqrt((lx-ex)**2 + (ly-ey)**2)
+                    if d < best_dist:
+                        best_dist = d; best_snap = (ex, ey)
+                elif q['type'] == 'line':
+                    # Line endpoints
+                    for lk in [('x1','y1'),('x2','y2')]:
+                        ox, oy = qp[lk[0]], qp[lk[1]]
+                        d = m.sqrt((lx-ox)**2 + (ly-oy)**2)
+                        if d < best_dist:
+                            best_dist = d; best_snap = (ox, oy)
             if best_snap:
                 lp[ep_key[0]] = best_snap[0]
                 lp[ep_key[1]] = best_snap[1]
