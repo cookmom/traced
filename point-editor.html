@@ -6,109 +6,173 @@
 body{background:#1a1a1a;color:#eee;font-family:'SF Mono',monospace;overflow:hidden;touch-action:none}
 #wrap{position:relative;display:inline-block}
 #wrap img{display:block;max-height:100vh;max-width:100vw;-webkit-user-drag:none;user-select:none}
-.pt{position:absolute;pointer-events:none;z-index:10;transition:opacity 0.15s}
-.pt.dim{opacity:0.25}
-.pt .lbl{position:absolute;left:18px;top:-6px;font-size:11px;white-space:nowrap;background:rgba(0,0,0,0.85);padding:1px 5px;border-radius:2px}
-.pt.active .lbl{background:#fff;color:#000;font-weight:bold}
-#panel{position:fixed;top:8px;right:8px;background:rgba(0,0,0,0.92);padding:10px;border-radius:8px;z-index:100;max-height:95vh;overflow-y:auto;width:240px;font-size:11px}
+#panel{position:fixed;top:8px;right:8px;background:rgba(0,0,0,0.92);padding:10px;border-radius:8px;z-index:100;max-height:95vh;overflow-y:auto;width:220px;font-size:11px}
 #panel h3{margin-bottom:6px;font-size:12px;color:#888}
-.row{display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid #222;cursor:pointer;border-radius:3px}
+.row{display:flex;justify-content:space-between;padding:3px 5px;border-bottom:1px solid #222;cursor:pointer;border-radius:3px}
 .row:hover{background:#333}
-.row.active{background:#c0392b}
+.row.active{background:#444;outline:1px solid #fff}
 .row .k{color:#aaa}.row .v{color:#fff}
-.row.active .k,.row.active .v{color:#fff}
 #measures{border-top:1px solid #444;padding-top:4px;margin-top:4px}
-button{margin-top:4px;padding:5px 10px;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px;width:100%}
+label{display:flex;align-items:center;gap:5px;padding:3px 0;color:#aaa;font-size:11px}
+button{margin-top:3px;padding:5px;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px;width:100%}
 #export{background:#c0392b}
-#add{background:#2980b9;margin-top:3px}
-#json-out{margin-top:6px;font-size:9px;color:#555;max-height:120px;overflow-y:auto;word-break:break-all}
+#add{background:#2980b9}
+#json-out{margin-top:4px;font-size:9px;color:#555;max-height:100px;overflow-y:auto;word-break:break-all}
 </style>
 </head><body>
 <div id="wrap"><img id="src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'"></div>
 <div id="panel">
-<h3>Points <span id="albl" style="color:#c0392b"></span></h3>
+<h3>Points <span id="albl" style="color:#fff"></span></h3>
 <div id="coords"></div>
 <div id="measures"></div>
-<label style="display:flex;align-items:center;gap:5px;padding:4px 0;color:#aaa"><input type="checkbox" id="sym" checked> Symmetric L↔R</label>
+<label><input type="checkbox" id="sym" checked> Symmetric L↔R</label>
 <button id="export" onclick="doExport()">📋 Copy JSON</button>
-<button id="add" onclick="doAdd()">+ Add Point</button>
+<button id="add" onclick="doAdd()">+ Add</button>
 <div id="json-out"></div>
 </div>
-<svg id="msv" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5"></svg>
+<canvas id="cv" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas>
 
 <script>
 var P=[
-{id:'OA',x:387,y:136,l:'Outer Apex',c:'outer'},
-{id:'OHL',x:100,y:480,l:'Outer HS L',c:'outer'},
-{id:'OHR',x:675,y:480,l:'Outer HS R',c:'outer'},
-{id:'OWL',x:85,y:380,l:'Outer Wide L',c:'outer'},
-{id:'OWR',x:690,y:380,l:'Outer Wide R',c:'outer'},
-{id:'IA',x:387,y:170,l:'Inner Apex',c:'inner'},
-{id:'IHL',x:135,y:480,l:'Inner HS L',c:'inner'},
-{id:'IHR',x:640,y:480,l:'Inner HS R',c:'inner'},
-{id:'IWL',x:120,y:380,l:'Inner Wide L',c:'inner'},
-{id:'IWR',x:655,y:380,l:'Inner Wide R',c:'inner'},
-{id:'OLL',x:100,y:1218,l:'Outer Leg L',c:'outer'},
-{id:'OLR',x:675,y:1218,l:'Outer Leg R',c:'outer'},
-{id:'ILL',x:135,y:1218,l:'Inner Leg L',c:'inner'},
-{id:'ILR',x:640,y:1218,l:'Inner Leg R',c:'inner'}
+{id:'OA',x:387,y:136,l:'Outer Apex',c:'o'},
+{id:'OHL',x:100,y:480,l:'Outer HS L',c:'o'},
+{id:'OHR',x:675,y:480,l:'Outer HS R',c:'o'},
+{id:'OWL',x:85,y:380,l:'Outer Wide L',c:'o'},
+{id:'OWR',x:690,y:380,l:'Outer Wide R',c:'o'},
+{id:'IA',x:387,y:170,l:'Inner Apex',c:'i'},
+{id:'IHL',x:135,y:480,l:'Inner HS L',c:'i'},
+{id:'IHR',x:640,y:480,l:'Inner HS R',c:'i'},
+{id:'IWL',x:120,y:380,l:'Inner Wide L',c:'i'},
+{id:'IWR',x:655,y:380,l:'Inner Wide R',c:'i'},
+{id:'OLL',x:100,y:1218,l:'Outer Leg L',c:'o'},
+{id:'OLR',x:675,y:1218,l:'Outer Leg R',c:'o'},
+{id:'ILL',x:135,y:1218,l:'Inner Leg L',c:'i'},
+{id:'ILR',x:640,y:1218,l:'Inner Leg R',c:'i'}
 ];
-var W=774,H=1280,s=1,act=null;
-var CX=387;
-var sym={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL'};
+var IW=774,IH=1280,s=1,act=null,CX=387;
+var sym_map={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL'};
+// Curves: arcs defined by 3 points (from, through/apex, to)
+// Left outer arc: from OHL through OWL to OA
+// Right outer arc: from OA through OWR to OHR
+// Left inner arc: from IHL through IWL to IA
+// Right inner arc: from IA through IWR to IHR
+var curves=[
+  {pts:['OHL','OWL','OA'],c:'o',l:'Outer L arc'},
+  {pts:['OA','OWR','OHR'],c:'o',l:'Outer R arc'},
+  {pts:['IHL','IWL','IA'],c:'i',l:'Inner L arc'},
+  {pts:['IA','IWR','IHR'],c:'i',l:'Inner R arc'},
+];
+var lines_def=[
+  {a:'OHL',b:'OLL',c:'o'},{a:'OHR',b:'OLR',c:'o'},
+  {a:'IHL',b:'ILL',c:'i'},{a:'IHR',b:'ILR',c:'i'},
+  {a:'OLL',b:'OLR',c:'o'},{a:'ILL',b:'ILR',c:'i'},
+];
 var meas=[
-{a:'OWL',b:'OWR',l:'Outer Width'},{a:'IWL',b:'IWR',l:'Inner Width'},
-{a:'OHL',b:'OHR',l:'HS Width'},{a:'IHL',b:'IHR',l:'Inner HS Width'},
-{a:'OA',b:'IA',l:'Band@Apex'},{a:'OWL',b:'IWL',l:'Band L'},{a:'OWR',b:'IWR',l:'Band R'}
+  {a:'OWL',b:'OWR',l:'Outer W'},{a:'IWL',b:'IWR',l:'Inner W'},
+  {a:'OHL',b:'OHR',l:'HS W'},{a:'OA',b:'IA',l:'Band@Apex'},
 ];
 
 function fp(id){return P.find(function(p){return p.id===id});}
-function sc(){s=document.getElementById('src').offsetWidth/W;}
+function sc(){s=document.getElementById('src').offsetWidth/IW;}
+function col(c,a){return c==='o'?'rgba(255,68,68,'+(a||1)+')':'rgba(68,136,255,'+(a||1)+')';}
+
+// Fit circle through 3 points
+function fitCircle(p1,p2,p3){
+  var ax=p1.x,ay=p1.y,bx=p2.x,by=p2.y,cx=p3.x,cy=p3.y;
+  var D=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
+  if(Math.abs(D)<0.001)return null;
+  var ux=((ax*ax+ay*ay)*(by-cy)+(bx*bx+by*by)*(cy-ay)+(cx*cx+cy*cy)*(ay-by))/D;
+  var uy=((ax*ax+ay*ay)*(cx-bx)+(bx*bx+by*by)*(ax-cx)+(cx*cx+cy*cy)*(bx-ax))/D;
+  var r=Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy));
+  return {cx:ux,cy:uy,r:r};
+}
 
 function render(){
   sc();
   var wrap=document.getElementById('wrap');
-  wrap.querySelectorAll('.pt').forEach(function(e){e.remove();});
-  P.forEach(function(p){
-    var el=document.createElement('div');
-    var isA=p.id===act;
-    var col=p.c==='outer'?'#ff4444':'#4488ff';
-    if(isA)col='#ffffff';
-    el.className='pt '+(isA?'active':(act?'dim':''));
-    el.style.left=(p.x*s-12)+'px';
-    el.style.top=(p.y*s-12)+'px';
-    el.innerHTML='<svg width="24" height="24"><line x1="0" y1="12" x2="24" y2="12" stroke="'+col+'" stroke-width="2"/><line x1="12" y1="0" x2="12" y2="24" stroke="'+col+'" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="'+col+'" stroke-width="2"/></svg><div class="lbl" style="color:'+col+'">'+p.id+'</div>';
-    wrap.appendChild(el);
+  var cv=document.getElementById('cv');
+  cv.width=wrap.offsetWidth*2;cv.height=wrap.offsetHeight*2;
+  cv.style.width=wrap.offsetWidth+'px';cv.style.height=wrap.offsetHeight+'px';
+  var ctx=cv.getContext('2d');
+  ctx.scale(2,2);
+  var S=s; // scale
+
+  // Draw curves (arcs through 3 points)
+  curves.forEach(function(cur){
+    var p1=fp(cur.pts[0]),p2=fp(cur.pts[1]),p3=fp(cur.pts[2]);
+    if(!p1||!p2||!p3)return;
+    var circle=fitCircle(p1,p2,p3);
+    if(!circle)return;
+    var a1=Math.atan2(p1.y-circle.cy,p1.x-circle.cx);
+    var a2=Math.atan2(p2.y-circle.cy,p2.x-circle.cx);
+    var a3=Math.atan2(p3.y-circle.cy,p3.x-circle.cx);
+    // Determine direction: go from a1 through a2 to a3
+    ctx.beginPath();
+    ctx.strokeStyle=col(cur.c,0.8);
+    ctx.lineWidth=2;
+    // Draw as polyline through computed arc points
+    var steps=60;
+    // Find sweep from a1 to a3 passing through a2
+    function normA(a){while(a<-Math.PI)a+=2*Math.PI;while(a>Math.PI)a-=2*Math.PI;return a;}
+    var d12=normA(a2-a1),d13=normA(a3-a1);
+    // If d12 and d13 have same sign and |d12|<|d13|, sweep is d13
+    // Otherwise go the other way
+    var sweep=d13;
+    if(d12*d13<0||(Math.abs(d12)>Math.abs(d13))){sweep=d13>0?d13-2*Math.PI:d13+2*Math.PI;}
+    for(var i=0;i<=steps;i++){
+      var t=i/steps;
+      var a=a1+sweep*t;
+      var px=circle.cx+circle.r*Math.cos(a);
+      var py=circle.cy+circle.r*Math.sin(a);
+      if(i===0)ctx.moveTo(px*S,py*S);else ctx.lineTo(px*S,py*S);
+    }
+    ctx.stroke();
   });
-  // Measurements
-  var svg=document.getElementById('msv');
-  svg.innerHTML='';
-  svg.style.width=wrap.offsetWidth+'px';
-  svg.style.height=wrap.offsetHeight+'px';
+
+  // Draw lines
+  lines_def.forEach(function(ln){
+    var a=fp(ln.a),b=fp(ln.b);if(!a||!b)return;
+    ctx.beginPath();ctx.strokeStyle=col(ln.c,0.6);ctx.lineWidth=1.5;
+    ctx.moveTo(a.x*S,a.y*S);ctx.lineTo(b.x*S,b.y*S);ctx.stroke();
+  });
+
+  // Draw measurement lines
   meas.forEach(function(m){
     var a=fp(m.a),b=fp(m.b);if(!a||!b)return;
-    var dx=b.x-a.x,dy=b.y-a.y,d=Math.round(Math.sqrt(dx*dx+dy*dy));
-    var ln=document.createElementNS('http://www.w3.org/2000/svg','line');
-    ln.setAttribute('x1',a.x*s);ln.setAttribute('y1',a.y*s);ln.setAttribute('x2',b.x*s);ln.setAttribute('y2',b.y*s);
-    ln.setAttribute('stroke','rgba(255,255,0,0.3)');ln.setAttribute('stroke-width','1');ln.setAttribute('stroke-dasharray','3,3');
-    svg.appendChild(ln);
-    var t=document.createElementNS('http://www.w3.org/2000/svg','text');
-    t.setAttribute('x',(a.x+b.x)/2*s);t.setAttribute('y',(a.y+b.y)/2*s-3);
-    t.setAttribute('fill','rgba(255,255,0,0.6)');t.setAttribute('font-size','9');t.setAttribute('text-anchor','middle');
-    t.textContent=d+'';svg.appendChild(t);
+    ctx.beginPath();ctx.strokeStyle='rgba(255,255,0,0.25)';ctx.lineWidth=0.5;
+    ctx.setLineDash([3,3]);ctx.moveTo(a.x*S,a.y*S);ctx.lineTo(b.x*S,b.y*S);ctx.stroke();ctx.setLineDash([]);
+    var d=Math.round(Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2));
+    ctx.fillStyle='rgba(255,255,0,0.5)';ctx.font='9px SF Mono,monospace';ctx.textAlign='center';
+    ctx.fillText(d+'',((a.x+b.x)/2)*S,((a.y+b.y)/2)*S-3);
   });
+
+  // Draw points: dots for unselected, crosshair for selected
+  P.forEach(function(p){
+    var isA=p.id===act;
+    var c=col(p.c);
+    if(isA){
+      // Crosshair
+      ctx.strokeStyle='#fff';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo((p.x-14)*S,p.y*S);ctx.lineTo((p.x+14)*S,p.y*S);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(p.x*S,(p.y-14)*S);ctx.lineTo(p.x*S,(p.y+14)*S);ctx.stroke();
+      ctx.beginPath();ctx.arc(p.x*S,p.y*S,5*S,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.stroke();
+      ctx.fillStyle='#fff';ctx.font='bold 10px SF Mono';ctx.textAlign='left';
+      ctx.fillText(p.id,(p.x+10)*S,(p.y-4)*S);
+    } else {
+      // Dot
+      ctx.beginPath();ctx.arc(p.x*S,p.y*S,3.5*S,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();
+      ctx.fillStyle=col(p.c,0.7);ctx.font='9px SF Mono';ctx.textAlign='left';
+      ctx.fillText(p.id,(p.x+6)*S,(p.y+3)*S);
+    }
+  });
+
   // Panel
   var h='';
-  P.forEach(function(p){
-    h+='<div class="row'+(p.id===act?' active':'')+'" onclick="sel(\''+p.id+'\')"><span class="k">'+p.id+'</span><span class="v">('+p.x+','+p.y+')</span></div>';
-  });
+  P.forEach(function(p){h+='<div class="row'+(p.id===act?' active':'')+'" onclick="sel(\''+p.id+'\')"><span class="k" style="color:'+col(p.c)+'">'+p.id+'</span><span class="v">('+p.x+','+p.y+')</span></div>';});
   document.getElementById('coords').innerHTML=h;
   var mh='';
-  meas.forEach(function(m){
-    var a=fp(m.a),b=fp(m.b);if(!a||!b)return;
-    var d=Math.round(Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2));
-    mh+='<div style="color:#888;padding:1px 0">'+m.l+': <b style="color:#fff">'+d+'</b></div>';
-  });
+  meas.forEach(function(m){var a=fp(m.a),b=fp(m.b);if(!a||!b)return;
+    mh+='<div style="color:#888">'+m.l+': <b style="color:#fff">'+Math.round(Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2))+'</b></div>';});
   document.getElementById('measures').innerHTML=mh;
   document.getElementById('albl').textContent=act?'→ '+act:'';
 }
@@ -116,35 +180,18 @@ function render(){
 function sel(id){act=(act===id)?null:id;render();}
 
 document.getElementById('wrap').addEventListener('click',function(e){
-  if(!act)return;
-  sc();
+  if(!act)return;sc();
   var r=this.getBoundingClientRect();
-  var x=Math.round((e.clientX-r.left)/s);
-  var y=Math.round((e.clientY-r.top)/s);
-  x=Math.max(0,Math.min(W,x));y=Math.max(0,Math.min(H,y));
-  var p=fp(act);if(!p)return;
-  p.x=x;p.y=y;
-  if(document.getElementById('sym').checked&&sym[act]){
-    var m=fp(sym[act]);if(m){m.x=2*CX-x;m.y=y;}
-  }
+  var x=Math.round((e.clientX-r.left)/s),y=Math.round((e.clientY-r.top)/s);
+  x=Math.max(0,Math.min(IW,x));y=Math.max(0,Math.min(IH,y));
+  var p=fp(act);if(!p)return;p.x=x;p.y=y;
+  if(document.getElementById('sym').checked&&sym_map[act]){var m=fp(sym_map[act]);if(m){m.x=2*CX-x;m.y=y;}}
   render();
 });
 
-function doExport(){
-  var o={};P.forEach(function(p){o[p.id]={x:p.x,y:p.y,label:p.l};});
-  var j=JSON.stringify(o,null,2);
-  navigator.clipboard.writeText(j).then(function(){
-    document.getElementById('json-out').textContent='✅ Copied!\n'+j;
-  }).catch(function(){document.getElementById('json-out').textContent=j;});
-}
-function doAdd(){
-  var id=prompt('ID:');if(!id)return;
-  var l=prompt('Label:')||id;
-  var c=prompt('outer/inner?')||'outer';
-  P.push({id:id,x:Math.round(W/2),y:Math.round(H/2),l:l,c:c});
-  act=id;render();
-}
-
+function doExport(){var o={};P.forEach(function(p){o[p.id]={x:p.x,y:p.y,label:p.l};});
+  var j=JSON.stringify(o,null,2);navigator.clipboard.writeText(j).then(function(){document.getElementById('json-out').textContent='✅ Copied!\n'+j;}).catch(function(){document.getElementById('json-out').textContent=j;});}
+function doAdd(){var id=prompt('ID:');if(!id)return;var l=prompt('Label:')||id;var c=prompt('o/i?')||'o';P.push({id:id,x:Math.round(IW/2),y:Math.round(IH/2),l:l,c:c});act=id;render();}
 document.getElementById('src').onload=render;
 window.addEventListener('resize',render);
 </script>
