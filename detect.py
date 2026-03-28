@@ -303,23 +303,24 @@ def _fit_blob(points, min_line_length=30):
     cr = fit_circle_ransac(points, max_radius=1000)
     cc = np.sum(cr[4]) if cr else 0
     
-    min_pts = max(10, len(points) * 0.25)
+    min_pts = max(10, min(len(points) * 0.15, 80))  # cap at 80 for large complex blobs
+    
+    # Circle: only valid if it explains >50% of the blob
+    circle_valid = cc >= min_pts and cc > len(points) * 0.5
     
     # Line first (Aristotle: simpler explanation wins)
     if lr and lc >= min_pts:
         p1, p2, mask = lr
         if np.linalg.norm(p2-p1) >= min_line_length:
-            # Line wins UNLESS circle explains >2x as many points
-            # (a genuine circle will dominate; a square's diagonal won't)
-            if cr is None or cc < lc * 2.0:
+            # Line wins UNLESS a VALID circle explains >2x as many points
+            if not circle_valid or cc < lc * 2.0:
                 return {
                     'type': 'line',
                     'params': {'x1':float(p1[0]),'y1':float(p1[1]),'x2':float(p2[0]),'y2':float(p2[1])},
                     'n_inliers': int(lc), 'mask': mask
                 }
     
-    # Circle only if it strongly dominates
-    if cc >= min_pts:
+    if circle_valid:
         center, radius, start, sweep, mask = cr
         return {
             'type': 'arc',
@@ -344,7 +345,7 @@ def detect_primitives(edge_points, image_shape, min_line_length=30):
     for bi in blobs:
         blob_pts = edge_points[bi]
         remaining = blob_pts.copy()
-        for _ in range(5):
+        for _ in range(15):  # up to 15 primitives per blob (3D cube has 12 edges)
             if len(remaining) < 10:
                 break
             result = _fit_blob(remaining, min_line_length)
