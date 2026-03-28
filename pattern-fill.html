@@ -233,7 +233,7 @@ function draw(){
     if (!innerArch) return;
 
     // --- BUILD BOUNDARIES from anchor points ---
-    var archInside = buildArchBoundary(innerArch, pts.IA, pts.IhL, pts.IhR, pts.ItL, pts.ItR, 8);
+    var archInside = buildArchBoundary(innerArch, pts.IA, pts.IhL, pts.IhR, pts.ItL, pts.ItR, 14);
     var archBBox = {
         x: pts.ItL[0],
         y: pts.IA[1],
@@ -242,14 +242,14 @@ function draw(){
     };
 
     // --- PATTERN FILL: emergent 6-fold, clipped to arch boundary ---
-    var gridSize = Math.round(archBBox.w / 16); // ~36px for this arch
+    var gridSize = Math.round(archBBox.w / 20); // ~36px for this arch
     var field = emergentPattern(archInside, archBBox, gridSize, 'hex');
-    drawLines(field, 1.0, 140);
+    drawLines(field, 1.3, 155);
 
     // --- BORDER BAND: derived from arch circle ---
     var bandWidth = gridSize * 0.45;
     var band = borderBand(innerArch, archInside, bandWidth, bandWidth * 2.2, 36);
-    drawLines(band, 1.2, 165);
+    drawLines(band, 1.5, 175);
 
     // --- STRUCTURAL DRAWING (from anchor points) ---
     stroke(192,57,43); strokeWeight(3); noFill();
