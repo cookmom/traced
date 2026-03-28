@@ -92,7 +92,7 @@ function fillArchWithPattern(archFunc, yStart, yEnd, tileSize, ctx) {
 }
 
 function setup() {
-    var c = createCanvas(W, H, WEBGL);
+    var c = createCanvas(W, H);
     pixelDensity(1);
     c.parent('wrap');
     brush.load();
@@ -100,8 +100,8 @@ function setup() {
 }
 
 function draw() {
-    translate(-W/2, -H/2);
-    clear();
+    
+    
     
     var ctx = drawingContext;
     
