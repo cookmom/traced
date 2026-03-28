@@ -116,3 +116,23 @@ Edge detection finds every pixel intensity change equally. Claude understands WH
 - **Band width**: the decorative border width (outer arch - inner arch)
 - **Horseshoe pinch**: where the arch curves INWARD past vertical before meeting legs
 - The arch band should be consistent width throughout — inner arch tracks outer arch at constant offset
+
+### Lesson 12: Point-Based Architecture > Parameter-Based
+Don't compute arches from center/radius/sweep. Instead:
+1. Mark key POINTS on the image (apex, springing L/R, leg bottoms, frame corners)
+2. Derive arcs FROM the points: "arc from P1 to P2, centered at P3"
+3. Derive lines FROM the points: "line from P1 to P2"
+4. Iterate: compare render to source, adjust POINT POSITIONS, regenerate
+
+### Lesson 13: Zellige/Islamic tile images are ALL dark
+The arch isn't a light opening with dark border. The entire surface is decorated tile.
+The arch shape is defined by pattern changes and carved borders, not brightness boundaries.
+Edge detection approaches fail because there IS no clear edge — it's texture on texture.
+Use visual understanding (Claude vision) or manual point marking, not pixel analysis.
+
+### Pointed Horseshoe Arch Geometry
+- Each half is an arc centered at the OPPOSITE springing point
+- r = distance from opposite springing to apex (both sides equal for symmetric arch)
+- The horseshoe pinch: the arc continues past the widest point, curving inward before meeting vertical legs
+- Band width: inner arch is offset ~30-40px from outer, tracking the same curve shape
+- Legs start at springing points and go straight down
