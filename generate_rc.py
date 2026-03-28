@@ -43,9 +43,6 @@ def generate_html(optimized, name="Building", ref_image_path=None):
       noFill();stroke(192,57,43);strokeWeight(3);
       var s1={start:.4f}+{actual_sweep:.4f}*p;
       arc({cx:.1f},{cy:.1f},{d:.1f},{d:.1f},{start:.4f},s1);
-      if(p<1){{stroke(192,57,43,60);strokeWeight(0.8);
-        line({cx:.1f},{cy:.1f},{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1));
-        fill(192,57,43);noStroke();ellipse({cx:.1f},{cy:.1f},5,5);noFill();}}
       return [{cx:.1f}+{r:.1f}*Math.cos(s1),{cy:.1f}+{r:.1f}*Math.sin(s1)];}}}}""")
     
     all_steps = ",\n".join(steps_js)
@@ -130,19 +127,12 @@ function setup(){{
 }}
 function draw(){{
   translate(-width/2,-height/2);
-  // Clear + redraw all completed strokes (native p5 = deterministic, fast)
-  clear();
-  push();noFill();
-  for(var i=0;i<STEPS.length;i++){{
-    if(STEPS[i]._done)STEPS[i].draw(1);
-  }}
-  pop();
-  // Active step
+  // No clear. Strokes accumulate permanently.
   var f3=Math.min(frameCount-1,totalAnimFrames-1);
   var activeStep=0;for(var i=STEPS.length-1;i>=0;i--){{if(f3>=frameStarts[i]){{activeStep=i;break;}}}}
-  // Mark newly completed
-  for(var i=0;i<activeStep;i++)STEPS[i]._done=true;
-  // Draw active step progress
+  // Draw completed steps ONCE (they persist on canvas)
+  for(var i=0;i<activeStep;i++){{if(!STEPS[i]._done){{push();noFill();STEPS[i].draw(1);pop();STEPS[i]._done=true;}}}}
+  // Draw active step
   var sf=f3-frameStarts[activeStep],sd=Math.max(1,frameEnds[activeStep]-frameStarts[activeStep]),prog=Math.min(1,sf/sd);
   push();noFill();var tip=STEPS[activeStep].draw(prog);pop();
   if(prog>=1)STEPS[activeStep]._done=true;
