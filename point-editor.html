@@ -34,58 +34,58 @@ button{margin-top:3px;padding:5px;color:#fff;border:none;border-radius:4px;curso
 
 <script>
 var P=[
-{id:'OA',x:385,y:77,l:'Outer Apex',c:'o'},
-{id:'OHL',x:73,y:621,l:'Outer HS L',c:'o'},
-{id:'OHR',x:701,y:621,l:'Outer HS R',c:'o'},
-{id:'OWL',x:45,y:476,l:'Outer Wide L',c:'o'},
-{id:'OWR',x:729,y:476,l:'Outer Wide R',c:'o'},
-{id:'IA',x:388,y:122,l:'Inner Apex',c:'i'},
-{id:'IHL',x:118,y:634,l:'Inner HS L',c:'i'},
-{id:'IHR',x:656,y:634,l:'Inner HS R',c:'i'},
-{id:'IWL',x:90,y:476,l:'Inner Wide L',c:'i'},
-{id:'IWR',x:684,y:476,l:'Inner Wide R',c:'i'},
-{id:'OLL',x:37,y:1262,l:'Outer Leg L',c:'o'},
-{id:'OLR',x:737,y:1262,l:'Outer Leg R',c:'o'},
-{id:'ILL',x:83,y:1265,l:'Inner Leg L',c:'i'},
-{id:'ILR',x:691,y:1265,l:'Inner Leg R',c:'i'},
-{id:'OTLL',x:43,y:670,l:'Outer LegTop L',c:'o'},
-{id:'OTLR',x:731,y:670,l:'Outer LegTop R',c:'o'},
-{id:'ITLL',x:88,y:658,l:'Inner LegTop L',c:'i'},
-{id:'ITLR',x:686,y:658,l:'Inner LegTop R',c:'i'},
-{id:'OPLL',x:30,y:650,l:'Outer PinchLow L',c:'o'},
-{id:'OPLR',x:744,y:650,l:'Outer PinchLow R',c:'o'},
-{id:'IPLL',x:75,y:648,l:'Inner PinchLow L',c:'i'},
-{id:'IPLR',x:699,y:648,l:'Inner PinchLow R',c:'i'},
-{id:'OTRL',x:48,y:670,l:'Outer Trans L',c:'o'},
-{id:'OTRR',x:726,y:670,l:'Outer Trans R',c:'o'},
-{id:'ITRL',x:93,y:658,l:'Inner Trans L',c:'i'},
-{id:'ITRR',x:681,y:658,l:'Inner Trans R',c:'i'}
+{id:'O.apex',x:385,y:77,l:'Outer Apex',c:'o'},
+{id:'O.hs.L',x:73,y:621,l:'Outer HS L',c:'o'},
+{id:'O.hs.R',x:701,y:621,l:'Outer HS R',c:'o'},
+{id:'O.wide.L',x:45,y:476,l:'Outer Wide L',c:'o'},
+{id:'O.wide.R',x:729,y:476,l:'Outer Wide R',c:'o'},
+{id:'I.apex',x:388,y:122,l:'Inner Apex',c:'i'},
+{id:'I.hs.L',x:118,y:634,l:'Inner HS L',c:'i'},
+{id:'I.hs.R',x:656,y:634,l:'Inner HS R',c:'i'},
+{id:'I.wide.L',x:90,y:476,l:'Inner Wide L',c:'i'},
+{id:'I.wide.R',x:684,y:476,l:'Inner Wide R',c:'i'},
+{id:'O.leg.L',x:37,y:1262,l:'Outer Leg L',c:'o'},
+{id:'O.leg.R',x:737,y:1262,l:'Outer Leg R',c:'o'},
+{id:'I.leg.L',x:83,y:1265,l:'Inner Leg L',c:'i'},
+{id:'I.leg.R',x:691,y:1265,l:'Inner Leg R',c:'i'},
+{id:'O.legTop.L',x:43,y:670,l:'Outer LegTop L',c:'o'},
+{id:'O.legTop.R',x:731,y:670,l:'Outer LegTop R',c:'o'},
+{id:'I.legTop.L',x:88,y:658,l:'Inner LegTop L',c:'i'},
+{id:'I.legTop.R',x:686,y:658,l:'Inner LegTop R',c:'i'},
+{id:'O.pinch.L',x:30,y:650,l:'Outer PinchLow L',c:'o'},
+{id:'O.pinch.R',x:744,y:650,l:'Outer PinchLow R',c:'o'},
+{id:'I.pinch.L',x:75,y:648,l:'Inner PinchLow L',c:'i'},
+{id:'I.pinch.R',x:699,y:648,l:'Inner PinchLow R',c:'i'},
+{id:'O.trans.L',x:48,y:670,l:'Outer Trans L',c:'o'},
+{id:'O.trans.R',x:726,y:670,l:'Outer Trans R',c:'o'},
+{id:'I.trans.L',x:93,y:658,l:'Inner Trans L',c:'i'},
+{id:'I.trans.R',x:681,y:658,l:'Inner Trans R',c:'i'}
 ];
 var IW=774,IH=1280,s=1,act=null,CX=387;
-var sym_map={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL',OTLL:'OTLR',OTLR:'OTLL',ITLL:'ITLR',ITLR:'ITLL',OPLL:'OPLR',OPLR:'OPLL',IPLL:'IPLR',IPLR:'IPLL',OTRL:'OTRR',OTRR:'OTRL',ITRL:'ITRR',ITRR:'ITRL'};
+var sym_map={OHL:'O.hs.R',OHR:'O.hs.L',OWL:'O.wide.R',OWR:'O.wide.L',IHL:'I.hs.R',IHR:'I.hs.L',IWL:'I.wide.R',IWR:'I.wide.L',OLL:'O.leg.R',OLR:'O.leg.L',ILL:'I.leg.R',ILR:'I.leg.L',OTLL:'O.legTop.R',OTLR:'O.legTop.L',ITLL:'I.legTop.R',ITLR:'I.legTop.L',OPLL:'O.pinch.R',OPLR:'O.pinch.L',IPLL:'I.pinch.R',IPLR:'I.pinch.L',OTRL:'O.trans.R',OTRR:'O.trans.L',ITRL:'I.trans.R',ITRR:'I.trans.L'};
 // Curves: arcs defined by 3 points (from, through/apex, to)
 // Left outer arc: from OHL through OWL to OA
 // Right outer arc: from OA through OWR to OHR
 // Left inner arc: from IHL through IWL to IA
 // Right inner arc: from IA through IWR to IHR
 var curves=[
-  {pts:['OHL','OWL','OA'],c:'o',l:'Outer L arc'},
-  {pts:['OA','OWR','OHR'],c:'o',l:'Outer R arc'},
-  {pts:['IHL','IWL','IA'],c:'i',l:'Inner L arc'},
-  {pts:['IA','IWR','IHR'],c:'i',l:'Inner R arc'},
-  {pts:['OHL','OPLL','OTRL'],c:'o',l:'Outer pinch L'},
-  {pts:['OHR','OPLR','OTRR'],c:'o',l:'Outer pinch R'},
-  {pts:['IHL','IPLL','ITRL'],c:'i',l:'Inner pinch L'},
-  {pts:['IHR','IPLR','ITRR'],c:'i',l:'Inner pinch R'},
+  {pts:['O.hs.L','O.wide.L','O.apex'],c:'o',l:'Outer L arc'},
+  {pts:['O.apex','O.wide.R','O.hs.R'],c:'o',l:'Outer R arc'},
+  {pts:['I.hs.L','I.wide.L','I.apex'],c:'i',l:'Inner L arc'},
+  {pts:['I.apex','I.wide.R','I.hs.R'],c:'i',l:'Inner R arc'},
+  {pts:['O.hs.L','O.pinch.L','O.trans.L'],c:'o',l:'Outer pinch L'},
+  {pts:['O.hs.R','O.pinch.R','O.trans.R'],c:'o',l:'Outer pinch R'},
+  {pts:['I.hs.L','I.pinch.L','I.trans.L'],c:'i',l:'Inner pinch L'},
+  {pts:['I.hs.R','I.pinch.R','I.trans.R'],c:'i',l:'Inner pinch R'},
 ];
 var lines_def=[
   
-  {a:'OTRL',b:'OTLL',c:'o'},{a:'OTRR',b:'OTLR',c:'o'},{a:'ITRL',b:'ITLL',c:'i'},{a:'ITRR',b:'ITLR',c:'i'},{a:'OTLL',b:'OLL',c:'o'},{a:'OTLR',b:'OLR',c:'o'},{a:'ITLL',b:'ILL',c:'i'},{a:'ITLR',b:'ILR',c:'i'},
-  {a:'OLL',b:'OLR',c:'o'},{a:'ILL',b:'ILR',c:'i'},
+  {a:'O.trans.L',b:'O.legTop.L',c:'o'},{a:'O.trans.R',b:'O.legTop.R',c:'o'},{a:'I.trans.L',b:'I.legTop.L',c:'i'},{a:'I.trans.R',b:'I.legTop.R',c:'i'},{a:'O.legTop.L',b:'O.leg.L',c:'o'},{a:'O.legTop.R',b:'O.leg.R',c:'o'},{a:'I.legTop.L',b:'I.leg.L',c:'i'},{a:'I.legTop.R',b:'I.leg.R',c:'i'},
+  {a:'O.leg.L',b:'O.leg.R',c:'o'},{a:'I.leg.L',b:'I.leg.R',c:'i'},
 ];
 var meas=[
-  {a:'OWL',b:'OWR',l:'Outer W'},{a:'IWL',b:'IWR',l:'Inner W'},
-  {a:'OHL',b:'OHR',l:'HS W'},{a:'OA',b:'IA',l:'Band@Apex'},
+  {a:'O.wide.L',b:'O.wide.R',l:'Outer W'},{a:'I.wide.L',b:'I.wide.R',l:'Inner W'},
+  {a:'O.hs.L',b:'O.hs.R',l:'HS W'},{a:'O.apex',b:'I.apex',l:'Band@Apex'},
 ];
 
 function fp(id){return P.find(function(p){return p.id===id});}
