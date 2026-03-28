@@ -302,41 +302,41 @@ function draw() {
     // Upper panels — largest grid (most breathing room)
     var upperL = eightFoldPattern(95, 668, 280, 206, 52);
     var upperR = eightFoldPattern(392, 668, 288, 206, 52);
-    drawLines(upperL, 0.6, 100);
-    drawLines(upperR, 0.6, 100);
+    drawLines(upperL, 1.4, 180);
+    drawLines(upperR, 1.4, 180);
 
     // Middle panels — medium grid
     var midL = eightFoldPattern(95, 888, 280, 155, 44);
     var midR = eightFoldPattern(392, 888, 288, 155, 44);
-    drawLines(midL, 0.5, 90);
-    drawLines(midR, 0.5, 90);
+    drawLines(midL, 1.2, 160);
+    drawLines(midR, 1.2, 160);
 
     // Lower panels — finest grid (densest detail, graded)
     var lowL = eightFoldPattern(95, 1055, 280, 158, 38);
     var lowR = eightFoldPattern(392, 1055, 288, 158, 38);
-    drawLines(lowL, 0.45, 80);
-    drawLines(lowR, 0.45, 80);
+    drawLines(lowL, 1.0, 150);
+    drawLines(lowR, 1.0, 150);
 
     // Arch zone: 6-fold pattern shaped to arch (Pretext method)
     var archC = fitCircle3(p.IhL, p.IwL, p.IA);
     if (archC) {
         var archLines = archPattern(archC, 135, 630, 32);
-        drawLines(archLines, 0.4, 70);
+        drawLines(archLines, 1.0, 140);
     }
 
     // Spandrels: 6-fold pattern in triangular zones
     // Left spandrel (x=27-80, y=50-620)
     var spL = sixFoldPattern(30, 55, 55, 570, 22);
-    drawLines(spL, 0.35, 65);
+    drawLines(spL, 0.8, 130);
     // Right spandrel
     var spR = sixFoldPattern(690, 55, 55, 570, 22);
-    drawLines(spR, 0.35, 65);
+    drawLines(spR, 0.8, 130);
 
     // Border strips: tiny 8-fold between legs (x=43-88 and x=686-731)
     var brdL = eightFoldPattern(45, 670, 40, 570, 18);
     var brdR = eightFoldPattern(689, 670, 40, 570, 18);
-    drawLines(brdL, 0.3, 55);
-    drawLines(brdR, 0.3, 55);
+    drawLines(brdL, 0.7, 120);
+    drawLines(brdR, 0.7, 120);
 
     // ========== STRUCTURE ==========
 
