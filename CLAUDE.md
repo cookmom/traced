@@ -40,3 +40,12 @@ Primitives → Optimize (chamfer distance) → Generate (p5.brush)
 - Compass arm during arc drawing: faint red line from center + center dot
 - Draw order: bottom to top, right to left
 - All HTML starts with `<!-- بسم الله الرحمن الرحيم -->`
+
+### Lesson 8: VERIFY YOUR OWN OUTPUT
+Before sending ANY result to Tawfeeq, actually look at the screenshot. Check pixel counts. If >5% of pixels are red on a real image, something is wrong. Don't send garbage and wait to be told it's garbage.
+
+### Lesson 9: SAM contour edges ≠ architectural lines
+SAM region boundaries are organic blobs, not geometric shapes. Tracing SAM contour vertices and fitting arcs between them produces noise, not architecture. SAM tells you WHERE shapes are, not WHAT shapes they are. The shapes still need to come from the actual image edges within each region.
+
+### Lesson 10: Don't keep iterating without rethinking
+When the approach fundamentally isn't working (1483 primitives, then 574, then 105, then 38 — and still garbage), STOP and rethink the approach instead of tuning parameters. Three failed attempts on the same idea means the idea is wrong.
