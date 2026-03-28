@@ -1,11 +1,11 @@
 <!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Traced — Islamic Pattern Fill</title>
+<title>Traced — Moroccan Zellige Door</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}
 #wrap{position:relative;height:100vh;width:calc(100vh*774/1280)}
-#ref-src{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.3;filter:grayscale(100%);z-index:1}
+#ref-src{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.25;filter:grayscale(100%);z-index:1}
 canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important;z-index:2}
 </style>
 </head><body>
@@ -17,83 +17,215 @@ canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important
 <script>
 var W=774, H=1280;
 
-function drawStar8(cx, cy, r) {
+// ==========================================
+// HASBA METHOD: 16-fold zellige star
+// Central rosette → regulation lines → interstice shapes
+// ==========================================
+function zelligeStar16(cx, cy, r) {
+    var n = 16;
+    var outerR = r;
+    var midR = r * 0.62;
+    var innerR = r * 0.38;
+    // 16-pointed star: alternate outer and inner vertices
     beginShape();
-    for(var i=0; i<8; i++) {
-        var a = i * Math.PI/4 - Math.PI/8;
-        vertex(cx + r * Math.cos(a), cy + r * Math.sin(a));
-        var midA = a + Math.PI/8;
-        vertex(cx + r*0.38 * Math.cos(midA), cy + r*0.38 * Math.sin(midA));
+    for (var i = 0; i < n; i++) {
+        var aOuter = (i / n) * TAU - TAU / (n * 2);
+        vertex(cx + outerR * Math.cos(aOuter), cy + outerR * Math.sin(aOuter));
+        // Kite notch toward center
+        var aInner = ((i + 0.5) / n) * TAU - TAU / (n * 2);
+        vertex(cx + innerR * Math.cos(aInner), cy + innerR * Math.sin(aInner));
     }
+    endShape(CLOSE);
+    // Inner regulation circle
+    ellipse(cx, cy, innerR * 2, innerR * 2);
+    // Regulation spokes (every other)
+    for (var i = 0; i < 8; i++) {
+        var a = (i / 8) * TAU;
+        line(cx + innerR * Math.cos(a), cy + innerR * Math.sin(a),
+             cx + midR * Math.cos(a), cy + midR * Math.sin(a));
+    }
+}
+
+// Cross interstice — fills gaps between stars in Hasba grid
+function intersticeX(cx, cy, s) {
+    var arm = s * 0.4;
+    var w = s * 0.15;
+    // 4 arms
+    for (var i = 0; i < 4; i++) {
+        var a = i * Math.PI / 2;
+        var ca = Math.cos(a), sa = Math.sin(a);
+        var pa = Math.cos(a + Math.PI/2), pb = Math.sin(a + Math.PI/2);
+        beginShape();
+        vertex(cx + w*pa, cy + w*pb);
+        vertex(cx + arm*ca + w*pa, cy + arm*sa + w*pb);
+        vertex(cx + arm*ca - w*pa, cy + arm*sa - w*pb);
+        vertex(cx - w*pa, cy - w*pb);
+        endShape(CLOSE);
+    }
+}
+
+// Diamond interstice
+function intersticeDiamond(cx, cy, s) {
+    var d = s * 0.35;
+    beginShape();
+    vertex(cx, cy - d); vertex(cx + d * 0.6, cy);
+    vertex(cx, cy + d); vertex(cx - d * 0.6, cy);
     endShape(CLOSE);
 }
 
-function drawRosette(cx, cy, r, n) {
-    for(var i=0; i<n; i++) {
-        var a1 = i * 2*Math.PI/n;
-        var a2 = (i+1) * 2*Math.PI/n;
-        var mx = cx + r*0.7*Math.cos((a1+a2)/2);
-        var my = cy + r*0.7*Math.sin((a1+a2)/2);
+// 8-fold rosette (lighter, for arch zone)
+function rosette8(cx, cy, r) {
+    var n = 8;
+    // Outer star
+    beginShape();
+    for (var i = 0; i < n; i++) {
+        var aO = (i / n) * TAU;
+        vertex(cx + r * Math.cos(aO), cy + r * Math.sin(aO));
+        var aI = ((i + 0.5) / n) * TAU;
+        vertex(cx + r * 0.45 * Math.cos(aI), cy + r * 0.45 * Math.sin(aI));
+    }
+    endShape(CLOSE);
+    // Petal arcs (manual bezier via vertices)
+    for (var i = 0; i < n; i++) {
+        var a1 = (i / n) * TAU;
+        var a2 = ((i + 1) / n) * TAU;
+        var mid = (a1 + a2) / 2;
         beginShape();
-        for(var j=0;j<=8;j++){
-            var tj=j/8;
-            var bx=(1-tj)*(1-tj)*(cx+r*0.3*Math.cos(a1))+2*(1-tj)*tj*mx+tj*tj*(cx+r*0.3*Math.cos(a2));
-            var by=(1-tj)*(1-tj)*(cy+r*0.3*Math.sin(a1))+2*(1-tj)*tj*my+tj*tj*(cy+r*0.3*Math.sin(a2));
-            vertex(bx,by);
+        for (var j = 0; j <= 10; j++) {
+            var t = j / 10;
+            var sx = cx + r * 0.35 * Math.cos(a1);
+            var sy = cy + r * 0.35 * Math.sin(a1);
+            var mx = cx + r * 0.75 * Math.cos(mid);
+            var my = cy + r * 0.75 * Math.sin(mid);
+            var ex = cx + r * 0.35 * Math.cos(a2);
+            var ey = cy + r * 0.35 * Math.sin(a2);
+            var bx = (1-t)*(1-t)*sx + 2*(1-t)*t*mx + t*t*ex;
+            var by = (1-t)*(1-t)*sy + 2*(1-t)*t*my + t*t*ey;
+            vertex(bx, by);
         }
         endShape();
     }
-    ellipse(cx, cy, r*0.6, r*0.6);
+    ellipse(cx, cy, r * 0.5, r * 0.5);
 }
 
-function fillPanel(x, y, w, h, tileSize) {
-    push();
-    stroke(192,57,43,160);
-    strokeWeight(0.8);
-    noFill();
-    var cols = Math.ceil(w / tileSize) + 1;
-    var rows = Math.ceil(h / tileSize) + 1;
-    for(var row=0; row<rows; row++) {
-        for(var col=0; col<cols; col++) {
-            var px = x + col * tileSize + tileSize/2;
-            var py = y + row * tileSize + tileSize/2;
-            if(px > x && px < x+w && py > y && py < y+h) {
-                drawStar8(px, py, tileSize*0.4);
+// 6-fold star for spandrels
+function star6(cx, cy, r) {
+    // Two overlapping triangles
+    for (var t = 0; t < 2; t++) {
+        var offset = t * Math.PI / 6;
+        beginShape();
+        for (var i = 0; i < 3; i++) {
+            var a = offset + (i / 3) * TAU;
+            vertex(cx + r * Math.cos(a), cy + r * Math.sin(a));
+        }
+        endShape(CLOSE);
+    }
+    ellipse(cx, cy, r * 0.5, r * 0.5);
+}
+
+// Interlace band (serpentine between two points)
+function interlaceBand(x1, y1, x2, y2, amplitude, periods) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var len = Math.sqrt(dx*dx + dy*dy);
+    var nx = -dy/len, ny = dx/len;
+    beginShape();
+    for (var i = 0; i <= 40; i++) {
+        var t = i / 40;
+        var mx = x1 + dx * t;
+        var my = y1 + dy * t;
+        var wave = Math.sin(t * periods * TAU) * amplitude;
+        vertex(mx + nx * wave, my + ny * wave);
+    }
+    endShape();
+}
+
+// ==========================================
+// PRETEXT-STYLE: fill shape row by row
+// getWidth(y) returns [xLeft, xRight] at that y
+// drawUnit(cx, cy, size) draws one pattern unit
+// ==========================================
+function pretextFill(getWidth, yStart, yEnd, unitSize, drawUnit) {
+    for (var y = yStart; y < yEnd; y += unitSize) {
+        var bounds = getWidth(y + unitSize / 2);
+        if (!bounds) continue;
+        var xL = bounds[0], xR = bounds[1];
+        var rowW = xR - xL;
+        if (rowW < unitSize * 0.8) continue;
+        var cols = Math.floor(rowW / unitSize);
+        var offset = xL + (rowW - cols * unitSize) / 2;
+        for (var col = 0; col < cols; col++) {
+            drawUnit(offset + col * unitSize + unitSize / 2, y + unitSize / 2, unitSize * 0.42);
+        }
+    }
+}
+
+// ==========================================
+// HASBA GRID: fill rectangle with zellige star + interstice
+// ==========================================
+function hasbaGrid(x, y, w, h, tileSize) {
+    var cols = Math.floor(w / tileSize);
+    var rows = Math.floor(h / tileSize);
+    var offX = x + (w - cols * tileSize) / 2;
+    var offY = y + (h - rows * tileSize) / 2;
+    for (var row = 0; row <= rows; row++) {
+        for (var col = 0; col <= cols; col++) {
+            var cx = offX + col * tileSize;
+            var cy = offY + row * tileSize;
+            if (cx >= x - 2 && cx <= x + w + 2 && cy >= y - 2 && cy <= y + h + 2) {
+                // Star at grid intersections
+                zelligeStar16(cx, cy, tileSize * 0.42);
+                // Interstice at grid cell centers
+                if (col < cols && row < rows) {
+                    intersticeX(cx + tileSize / 2, cy + tileSize / 2, tileSize * 0.3);
+                }
+                // Diamond between stars along edges
+                if (col < cols) {
+                    intersticeDiamond(cx + tileSize / 2, cy, tileSize * 0.25);
+                }
+                if (row < rows) {
+                    intersticeDiamond(cx, cy + tileSize / 2, tileSize * 0.25);
+                }
             }
         }
     }
-    pop();
 }
 
-function fitCircle3(p1,p2,p3){
+// ==========================================
+// GEOMETRY HELPERS
+// ==========================================
+function fitCircle3(p1, p2, p3) {
     var ax=p1[0],ay=p1[1],bx=p2[0],by=p2[1],cx=p3[0],cy=p3[1];
     var D=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
-    if(Math.abs(D)<0.01)return null;
+    if(Math.abs(D)<0.01) return null;
     var ux=((ax*ax+ay*ay)*(by-cy)+(bx*bx+by*by)*(cy-ay)+(cx*cx+cy*cy)*(ay-by))/D;
     var uy=((ax*ax+ay*ay)*(cx-bx)+(bx*bx+by*by)*(ax-cx)+(cx*cx+cy*cy)*(bx-ax))/D;
-    return{cx:ux,cy:uy,r:Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy))};
+    return {cx:ux, cy:uy, r:Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy))};
 }
 
-function drawArc3(p1,p2,p3){
-    var c=fitCircle3(p1,p2,p3); if(!c)return;
+function drawArc3(p1, p2, p3) {
+    var c=fitCircle3(p1,p2,p3); if(!c) return c;
     var a1=Math.atan2(p1[1]-c.cy,p1[0]-c.cx);
     var a2=Math.atan2(p2[1]-c.cy,p2[0]-c.cx);
     var a3=Math.atan2(p3[1]-c.cy,p3[0]-c.cx);
     var d12=a2-a1,d13=a3-a1;
-    while(d12>Math.PI)d12-=2*Math.PI;while(d12<-Math.PI)d12+=2*Math.PI;
-    while(d13>Math.PI)d13-=2*Math.PI;while(d13<-Math.PI)d13+=2*Math.PI;
+    while(d12>Math.PI)d12-=TAU; while(d12<-Math.PI)d12+=TAU;
+    while(d13>Math.PI)d13-=TAU; while(d13<-Math.PI)d13+=TAU;
     var sw=d13;
-    if(d12*d13<0||(Math.abs(d12)>Math.abs(d13)))sw=d13>0?d13-2*Math.PI:d13+2*Math.PI;
+    if(d12*d13<0||(Math.abs(d12)>Math.abs(d13))) sw=d13>0?d13-TAU:d13+TAU;
     beginShape();
     for(var i=0;i<=60;i++){var t=i/60;var a=a1+sw*t;vertex(c.cx+c.r*Math.cos(a),c.cy+c.r*Math.sin(a));}
     endShape();
+    return c;
 }
 
-function drawArc2(p1,p3,off){
-    var mx=(p1[0]+p3[0])/2+off,my=(p1[1]+p3[1])/2;
+function drawArc2(p1, p3, off) {
+    var mx=(p1[0]+p3[0])/2+off, my=(p1[1]+p3[1])/2;
     drawArc3(p1,[mx,my],p3);
 }
 
+// ==========================================
+// MAIN
+// ==========================================
 function setup() {
     createCanvas(W, H, WEBGL);
     pixelDensity(1);
@@ -106,21 +238,116 @@ function draw() {
     translate(-W/2, -H/2);
 
     var p = {
-        'OA':[387,78],'OhL':[73,621],'OhR':[701,621],'OwL':[46,475],'OwR':[728,475],
-        'IA':[387,122],'IhL':[118,635],'IhR':[656,635],'IwL':[89,476],'IwR':[685,476],
-        'OpL':[55,671],'OpR':[719,671],'IpL':[102,656],'IpR':[672,656],
-        'OtL':[43,670],'OtR':[731,670],'ItL':[88,658],'ItR':[686,658]
+        OA:[387,78], OhL:[73,621], OhR:[701,621], OwL:[46,475], OwR:[728,475],
+        IA:[387,122], IhL:[118,635], IhR:[656,635], IwL:[89,476], IwR:[685,476],
+        OpL:[55,671], OpR:[719,671], IpL:[102,656], IpR:[672,656],
+        OtL:[43,670], OtR:[731,670], ItL:[88,658], ItR:[686,658]
     };
 
-    // Structure (heavy)
-    stroke(192,57,43); strokeWeight(3); noFill();
-    drawArc3(p.OhL,p.OwL,p.OA); drawArc3(p.OA,p.OwR,p.OhR);
-    drawArc3(p.IhL,p.IwL,p.IA); drawArc3(p.IA,p.IwR,p.IhR);
+    // ========== PATTERN FILLS (drawn first, structure on top) ==========
 
+    // --- Door panels: Hasba grid with 16-fold zellige stars ---
+    push();
+    stroke(192, 57, 43, 100); strokeWeight(0.6); noFill();
+    // Upper panels (largest tiles)
+    hasbaGrid(95, 665, 280, 210, 52);
+    hasbaGrid(390, 665, 290, 210, 52);
+    // Middle panels
+    hasbaGrid(95, 888, 280, 155, 44);
+    hasbaGrid(390, 888, 290, 155, 44);
+    // Lower panels
+    hasbaGrid(95, 1055, 280, 160, 40);
+    hasbaGrid(390, 1055, 290, 160, 40);
+    pop();
+
+    // --- Arch zone: Pretext-style rosettes flowing along arch width ---
+    var archCircle = fitCircle3(p.IhL, p.IwL, p.IA);
+    if (archCircle) {
+        push();
+        stroke(192, 57, 43, 80); strokeWeight(0.4); noFill();
+        pretextFill(
+            function(y) {
+                var dy = y - archCircle.cy;
+                if (Math.abs(dy) >= archCircle.r) return null;
+                var dx = Math.sqrt(archCircle.r * archCircle.r - dy * dy);
+                var xL = archCircle.cx - dx + 15;
+                var xR = 774 - archCircle.cx + archCircle.cx + dx - 15;
+                // Symmetric: mirror around 387
+                xR = 387 + (387 - xL);
+                if (xR - xL < 30) return null;
+                return [xL, xR];
+            },
+            140, 630, 28, rosette8
+        );
+        pop();
+
+        // Concentric band arcs inside the arch (3 bands)
+        push();
+        stroke(192, 57, 43, 60); strokeWeight(0.5); noFill();
+        for (var band = 0; band < 3; band++) {
+            var br = archCircle.r - 30 - band * 25;
+            if (br < 50) continue;
+            beginShape();
+            for (var i = 0; i <= 40; i++) {
+                var t = i / 40;
+                var a = -Math.PI * 0.85 + t * Math.PI * 0.7;
+                vertex(archCircle.cx + br * Math.cos(a), archCircle.cy + br * Math.sin(a));
+            }
+            endShape();
+        }
+        pop();
+    }
+
+    // --- Spandrels: 6-fold stars + interlace in triangular zones ---
+    push();
+    stroke(192, 57, 43, 90); strokeWeight(0.5); noFill();
+    // Left spandrel (triangle: top-left frame corner → arch shoulder)
+    var spandrelUnits = [
+        [55, 120, 14], [55, 160, 12], [55, 200, 12],
+        [55, 240, 10], [55, 280, 10], [55, 320, 10],
+        [90, 140, 12], [90, 180, 12], [90, 220, 10],
+        [90, 260, 10], [125, 160, 10], [125, 200, 10],
+    ];
+    for (var i = 0; i < spandrelUnits.length; i++) {
+        var su = spandrelUnits[i];
+        star6(su[0], su[1], su[2]);
+        // Mirror right
+        star6(774 - su[0], su[1], su[2]);
+    }
+    // Interlace bands in spandrels
+    strokeWeight(0.7);
+    interlaceBand(35, 80, 60, 450, 8, 5);
+    interlaceBand(50, 80, 75, 450, 6, 7);
+    interlaceBand(774-35, 80, 774-60, 450, 8, 5);
+    interlaceBand(774-50, 80, 774-75, 450, 6, 7);
+    pop();
+
+    // --- Border decoration between frame and arch legs ---
+    push();
+    stroke(192, 57, 43, 70); strokeWeight(0.4); noFill();
+    // Left border strip (between x=43 and x=88)
+    for (var y = 680; y < 1240; y += 20) {
+        intersticeDiamond(65, y, 12);
+    }
+    // Right border strip
+    for (var y = 680; y < 1240; y += 20) {
+        intersticeDiamond(709, y, 12);
+    }
+    pop();
+
+    // ========== STRUCTURAL DRAWING (on top) ==========
+
+    // Main arcs
+    stroke(192, 57, 43); strokeWeight(3); noFill();
+    drawArc3(p.OhL, p.OwL, p.OA); drawArc3(p.OA, p.OwR, p.OhR);
+    drawArc3(p.IhL, p.IwL, p.IA); drawArc3(p.IA, p.IwR, p.IhR);
+
+    // Pinch arcs
     strokeWeight(2);
-    drawArc2(p.OhL,p.OpL,-6); drawArc2(p.OhR,p.OpR,6);
-    drawArc2(p.IhL,p.IpL,-5); drawArc2(p.IhR,p.IpR,5);
+    drawArc2(p.OhL, p.OpL, -6); drawArc2(p.OhR, p.OpR, 6);
+    drawArc2(p.IhL, p.IpL, -5); drawArc2(p.IhR, p.IpR, 5);
 
+    // Legs
     strokeWeight(3);
     line(p.OpL[0],p.OpL[1],p.OtL[0],p.OtL[1]); line(p.OpR[0],p.OpR[1],p.OtR[0],p.OtR[1]);
     line(p.IpL[0],p.IpL[1],p.ItL[0],p.ItL[1]); line(p.IpR[0],p.IpR[1],p.ItR[0],p.ItR[1]);
@@ -130,48 +357,29 @@ function draw() {
     // Outer frame
     strokeWeight(4);
     line(27,50,27,1244); line(747,50,747,1244); line(27,1244,747,1244);
+    line(27,50,747,50);
 
-    // Door
+    // Door divisions
     strokeWeight(2);
-    line(382,122,382,1218);
-    line(88,658,382,658); line(382,658,686,658);
+    line(387,122,387,1218);
+    line(88,658,686,658);
     line(88,881,686,881); line(88,1049,686,1049); line(88,1218,686,1218);
 
+    // Threshold
     line(27,1265,747,1265);
 
-    // Knocker
-    ellipse(395,680,40,40); ellipse(395,680,70,70);
-    strokeWeight(1);
-    for(var i=0;i<12;i++){var a=i*Math.PI/6;line(395+20*Math.cos(a),680+20*Math.sin(a),395+35*Math.cos(a),680+35*Math.sin(a));}
-
-    // Pattern fills
-    fillPanel(95, 665, 280, 210, 35);
-    fillPanel(390, 665, 290, 210, 35);
-    fillPanel(95, 888, 280, 155, 30);
-    fillPanel(390, 888, 290, 155, 30);
-    fillPanel(95, 1055, 280, 160, 28);
-    fillPanel(390, 1055, 290, 160, 28);
-
-    // Arch zone rosettes
-    push();
-    stroke(192,57,43,100); strokeWeight(0.5); noFill();
-    for(var y=140; y<640; y+=25) {
-        var c = fitCircle3(p.IhL,p.IwL,p.IA);
-        if(!c) continue;
-        var dy = y - c.cy;
-        if(Math.abs(dy) >= c.r) continue;
-        var dx = Math.sqrt(c.r*c.r - dy*dy);
-        var xL = c.cx - dx + 10;
-        var xR = 774 - xL;
-        var rw = xR - xL;
-        if(rw < 30) continue;
-        var cols = Math.floor(rw / 25);
-        var off = xL + (rw - cols*25)/2;
-        for(var col=0; col<cols; col++) {
-            drawRosette(off + col*25 + 12, y + 12, 10, 8);
+    // Door knockers (paired, centered on each door leaf)
+    strokeWeight(1.5);
+    var knockers = [237, 537];
+    for (var k = 0; k < 2; k++) {
+        var kx = knockers[k], ky = 770;
+        ellipse(kx, ky, 30, 30);
+        ellipse(kx, ky, 50, 50);
+        for (var i = 0; i < 8; i++) {
+            var a = i * Math.PI / 4;
+            line(kx+15*Math.cos(a), ky+15*Math.sin(a), kx+25*Math.cos(a), ky+25*Math.sin(a));
         }
     }
-    pop();
 }
 </script>
 </body></html>
