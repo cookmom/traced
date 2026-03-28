@@ -1,6 +1,6 @@
 <!-- بسم الله الرحمن الرحيم -->
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Traced — Arch Zellige Field v5</title>
+<title>Traced — Pattern System v6</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#f2eada;overflow:hidden;display:flex;justify-content:center;align-items:flex-start}
@@ -18,190 +18,11 @@ canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important
 var W=774, H=1280;
 
 // ============================================================
-// POINT-IN-ARCH TEST
-// Hard boundary. No exceptions. Every point must pass this.
+// TRACED PATTERN SYSTEM
+// All geometry derived from anchor points. Nothing hardcoded.
 // ============================================================
-var ARCH_CX, ARCH_CY, ARCH_R;
 
-function insideArch(x, y) {
-    // Above apex or below legs: out
-    if (y < 128 || y > 628) return false;
-    
-    // The arch is bounded by the circle at the TOP
-    // and by the inner leg lines (x=92 left, x=682 right) at the SIDES
-    // The transition happens at the wide points (y≈476)
-    
-    // Circle boundary
-    var dy = y - ARCH_CY;
-    if (Math.abs(dy) >= ARCH_R) return false;
-    var maxDx = Math.sqrt(ARCH_R * ARCH_R - dy * dy);
-    var circleLeft = 387 - maxDx;
-    var circleRight = 387 + maxDx;
-    
-    // Leg boundary (constant below the wide points)
-    var legLeft = 120;
-    var legRight = 654;
-    
-    // Use the TIGHTER of circle and legs
-    var left = Math.max(circleLeft, legLeft);
-    var right = Math.min(circleRight, legRight);
-    
-    return x >= left && x <= right;
-}
-
-// Clip a line segment so BOTH endpoints are inside the arch.
-// If either is outside, walk inward to find the boundary crossing.
-function clipToArch(x1, y1, x2, y2) {
-    var in1 = insideArch(x1, y1);
-    var in2 = insideArch(x2, y2);
-    if (in1 && in2) return [x1, y1, x2, y2];
-    if (!in1 && !in2) return null;
-    // Binary search for the crossing point
-    var steps = 12;
-    var ax = x1, ay = y1, bx = x2, by = y2;
-    if (!in1) { ax = x2; ay = y2; bx = x1; by = y1; } // ax,ay is inside
-    for (var i = 0; i < steps; i++) {
-        var mx = (ax + bx) / 2, my = (ay + by) / 2;
-        if (insideArch(mx, my)) { ax = mx; ay = my; }
-        else { bx = mx; by = my; }
-    }
-    if (!in1) return [ax, ay, x2, y2];
-    return [x1, y1, ax, ay];
-}
-
-// ============================================================
-// CIRCLE INTERSECTION (emergent pattern engine)
-// ============================================================
-function circleIntersections(x1,y1,r1,x2,y2,r2){
-    var dx=x2-x1,dy=y2-y1,d=Math.sqrt(dx*dx+dy*dy);
-    if(d>r1+r2||d<Math.abs(r1-r2)||d<0.01)return[];
-    var a=(r1*r1-r2*r2+d*d)/(2*d);
-    var hSq=r1*r1-a*a; if(hSq<0)return[];
-    var h=Math.sqrt(hSq);
-    var mx=x1+a*dx/d,my=y1+a*dy/d;
-    return[[mx-dy*h/d,my+dx*h/d],[mx+dy*h/d,my-dx*h/d]];
-}
-
-// ============================================================
-// GENERATE ONE CONTINUOUS FIELD PATTERN
-// Hexagonal circle grid → intersection points → connect adjacent
-// ALL lines hard-clipped to arch boundary
-// ============================================================
-function generateFieldPattern(gridSize) {
-    var r = gridSize / 2;
-    var margin = gridSize * 2;
-    var centers = [];
-    var rowH = gridSize * Math.sqrt(3) / 2;
-    var row = 0;
-
-    // Hexagonal grid of circles covering the arch region
-    for (var y = 80; y <= 680; y += rowH) {
-        var offset = (row % 2) * gridSize / 2;
-        for (var x = 30; x <= 744; x += gridSize) {
-            var cx = x + offset;
-            // Only place circles near the arch (generous margin)
-            if (insideArch(cx, y) ||
-                insideArch(cx + gridSize, y) ||
-                insideArch(cx - gridSize, y) ||
-                insideArch(cx, y + gridSize) ||
-                insideArch(cx, y - gridSize)) {
-                centers.push([cx, y]);
-            }
-        }
-        row++;
-    }
-
-    // Find intersection points between neighboring circles
-    var pts = new Map();
-    function ptKey(x, y) { return (Math.round(x * 8)) + ',' + (Math.round(y * 8)); }
-
-    for (var i = 0; i < centers.length; i++) {
-        for (var j = i + 1; j < centers.length; j++) {
-            var dx = centers[j][0] - centers[i][0];
-            var dy = centers[j][1] - centers[i][1];
-            var dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < gridSize * 1.16 && dist > 0.1) {
-                var isects = circleIntersections(
-                    centers[i][0], centers[i][1], r,
-                    centers[j][0], centers[j][1], r
-                );
-                for (var k = 0; k < isects.length; k++) {
-                    var key = ptKey(isects[k][0], isects[k][1]);
-                    if (!pts.has(key)) pts.set(key, isects[k]);
-                }
-            }
-        }
-    }
-
-    // Connect adjacent intersection points on each circle
-    var lines = [];
-    for (var i = 0; i < centers.length; i++) {
-        var cx = centers[i][0], cy = centers[i][1];
-        var onCircle = [];
-        pts.forEach(function(pt) {
-            var dx = pt[0] - cx, dy = pt[1] - cy;
-            if (Math.abs(Math.sqrt(dx * dx + dy * dy) - r) < 1.5) {
-                onCircle.push({ x: pt[0], y: pt[1], angle: Math.atan2(dy, dx) });
-            }
-        });
-        onCircle.sort(function(a, b) { return a.angle - b.angle; });
-
-        for (var k = 0; k < onCircle.length; k++) {
-            var next = (k + 1) % onCircle.length;
-            // HARD CLIP to arch
-            var cl = clipToArch(
-                onCircle[k].x, onCircle[k].y,
-                onCircle[next].x, onCircle[next].y
-            );
-            if (cl) lines.push(cl);
-        }
-    }
-    return lines;
-}
-
-// ============================================================
-// BORDER BAND along inner arch curve
-// ============================================================
-function generateBorderBand(archC, inset1, inset2, nDivisions) {
-    var lines = [];
-    // Two concentric arcs
-    for (var band = 0; band < 2; band++) {
-        var br = archC.r - (band === 0 ? inset1 : inset2);
-        var prev = null;
-        for (var i = 0; i <= 80; i++) {
-            var t = i / 80;
-            var a = -PI * 0.87 + t * PI * 0.74;
-            var px = archC.cx + br * Math.cos(a);
-            var py = archC.cy + br * Math.sin(a);
-            if (insideArch(px, py) && py >= 120 && py <= 640) {
-                if (prev) lines.push([prev[0], prev[1], px, py]);
-                prev = [px, py];
-            } else {
-                prev = null;
-            }
-        }
-    }
-    // Cross-ties between the two bands
-    var r1 = archC.r - inset1, r2 = archC.r - inset2;
-    for (var i = 0; i < nDivisions; i++) {
-        var t = (i + 0.5) / nDivisions;
-        var a = -PI * 0.87 + t * PI * 0.74;
-        var x1 = archC.cx + r1 * Math.cos(a), y1 = archC.cy + r1 * Math.sin(a);
-        var x2 = archC.cx + r2 * Math.cos(a), y2 = archC.cy + r2 * Math.sin(a);
-        if (insideArch(x1, y1) && insideArch(x2, y2))
-            lines.push([x1, y1, x2, y2]);
-    }
-    return lines;
-}
-
-// ============================================================
-function drawLines(lines, sw, alpha) {
-    push(); stroke(192, 57, 43, alpha); strokeWeight(sw); noFill();
-    for (var i = 0; i < lines.length; i++)
-        line(lines[i][0], lines[i][1], lines[i][2], lines[i][3]);
-    pop();
-}
-
+// --- Math ---
 function fitCircle3(p1,p2,p3){
     var ax=p1[0],ay=p1[1],bx=p2[0],by=p2[1],cx=p3[0],cy=p3[1];
     var D=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
@@ -210,6 +31,175 @@ function fitCircle3(p1,p2,p3){
     var uy=((ax*ax+ay*ay)*(cx-bx)+(bx*bx+by*by)*(ax-cx)+(cx*cx+cy*cy)*(bx-ax))/D;
     return{cx:ux,cy:uy,r:Math.sqrt((ax-ux)*(ax-ux)+(ay-uy)*(ay-uy))};
 }
+
+function circleIntersections(x1,y1,r1,x2,y2,r2){
+    var dx=x2-x1,dy=y2-y1,d=Math.sqrt(dx*dx+dy*dy);
+    if(d>r1+r2||d<Math.abs(r1-r2)||d<0.01)return[];
+    var a=(r1*r1-r2*r2+d*d)/(2*d);
+    var hSq=r1*r1-a*a;if(hSq<0)return[];
+    var h=Math.sqrt(hSq);
+    var mx=x1+a*dx/d,my=y1+a*dy/d;
+    return[[mx-dy*h/d,my+dx*h/d],[mx+dy*h/d,my-dx*h/d]];
+}
+
+// --- Boundary: a general polygon/arc boundary test ---
+// Build a boundary from anchor points: arch arcs + straight legs
+// Returns a function(x,y) → boolean
+
+function buildArchBoundary(archCircle, apex, hsL, hsR, legTopL, legTopR, margin) {
+    var m = margin || 0;
+    var cx = archCircle.cx, cy = archCircle.cy, r = archCircle.r - m;
+    var symmetryX = (apex[0]);
+    var yTop = apex[1] + m;
+    var yBottom = Math.max(hsL[1], hsR[1]) - m;
+    var xLegL = Math.max(legTopL[0], hsL[0]) + m;
+    var xLegR = Math.min(legTopR[0], hsR[0]) - m;
+
+    return function(x, y) {
+        if (y < yTop || y > yBottom) return false;
+        // Circle boundary
+        var dy = y - cy;
+        if (Math.abs(dy) >= r) return false;
+        var maxDx = Math.sqrt(r * r - dy * dy);
+        var circleL = cx - maxDx;
+        var circleR = cx + maxDx;
+        // Leg boundary
+        var left = Math.max(circleL, xLegL);
+        var right = Math.min(circleR, xLegR);
+        return x >= left && x <= right;
+    };
+}
+
+function buildRectBoundary(x, y, w, h, margin) {
+    var m = margin || 0;
+    return function(px, py) {
+        return px >= x+m && px <= x+w-m && py >= y+m && py <= y+h-m;
+    };
+}
+
+// --- Clip a line to any boundary function ---
+function clipToBoundary(x1,y1,x2,y2, inside) {
+    var in1 = inside(x1,y1), in2 = inside(x2,y2);
+    if (in1 && in2) return [x1,y1,x2,y2];
+    if (!in1 && !in2) return null;
+    // Binary search for crossing
+    var ax=in1?x1:x2, ay=in1?y1:y2, bx=in1?x2:x1, by=in1?y2:y1;
+    for (var i=0;i<14;i++) {
+        var mx=(ax+bx)/2, my=(ay+by)/2;
+        if(inside(mx,my)){ax=mx;ay=my;}else{bx=mx;by=my;}
+    }
+    return in1 ? [x1,y1,ax,ay] : [ax,ay,x2,y2];
+}
+
+// --- Emergent pattern generator ---
+// Takes a boundary function and grid params, returns line segments
+function emergentPattern(inside, bbox, gridSize, gridType) {
+    var r = gridSize / 2;
+    var margin = gridSize * 1.5;
+    var centers = [];
+    var bx = bbox.x, by = bbox.y, bw = bbox.w, bh = bbox.h;
+
+    if (gridType === 'hex') {
+        var rowH = gridSize * Math.sqrt(3) / 2;
+        var row = 0;
+        for (var y = by - margin; y <= by + bh + margin; y += rowH) {
+            var offset = (row % 2) * gridSize / 2;
+            for (var x = bx - margin; x <= bx + bw + margin; x += gridSize) {
+                var cx = x + offset;
+                // Only keep centers near the boundary (generous check)
+                if (inside(cx, y) || inside(cx+r, y) || inside(cx-r, y) ||
+                    inside(cx, y+r) || inside(cx, y-r)) {
+                    centers.push([cx, y]);
+                }
+            }
+            row++;
+        }
+    } else {
+        // Square grid
+        for (var y = by - margin; y <= by + bh + margin; y += gridSize) {
+            for (var x = bx - margin; x <= bx + bw + margin; x += gridSize) {
+                if (inside(x, y) || inside(x+r, y) || inside(x-r, y) ||
+                    inside(x, y+r) || inside(x, y-r)) {
+                    centers.push([x, y]);
+                }
+            }
+        }
+    }
+
+    // Intersections
+    var pts = new Map();
+    var maxDist = gridSize * (gridType === 'hex' ? 1.16 : 1.42);
+    function ptKey(x,y){return(Math.round(x*8))+','+(Math.round(y*8));}
+
+    for (var i = 0; i < centers.length; i++) {
+        for (var j = i+1; j < centers.length; j++) {
+            var dx = centers[j][0]-centers[i][0], dy = centers[j][1]-centers[i][1];
+            var dist = Math.sqrt(dx*dx+dy*dy);
+            if (dist < maxDist && dist > 0.1) {
+                var isects = circleIntersections(centers[i][0],centers[i][1],r,centers[j][0],centers[j][1],r);
+                for (var k=0;k<isects.length;k++) {
+                    var key=ptKey(isects[k][0],isects[k][1]);
+                    if(!pts.has(key))pts.set(key,isects[k]);
+                }
+            }
+        }
+    }
+
+    // Connect adjacent intersection points per circle, clip to boundary
+    var lines = [];
+    for (var i = 0; i < centers.length; i++) {
+        var cx = centers[i][0], cy = centers[i][1];
+        var onC = [];
+        pts.forEach(function(pt) {
+            var dx=pt[0]-cx, dy=pt[1]-cy;
+            if (Math.abs(Math.sqrt(dx*dx+dy*dy)-r) < 1.5)
+                onC.push({x:pt[0],y:pt[1],angle:Math.atan2(dy,dx)});
+        });
+        onC.sort(function(a,b){return a.angle-b.angle;});
+        for (var k=0; k<onC.length; k++) {
+            var next = (k+1) % onC.length;
+            var cl = clipToBoundary(onC[k].x, onC[k].y, onC[next].x, onC[next].y, inside);
+            if (cl) lines.push(cl);
+        }
+    }
+    return lines;
+}
+
+// --- Border band generator ---
+// Inset arcs along any arch boundary
+function borderBand(archCircle, inside, inset1, inset2, nTies) {
+    var lines = [];
+    var cx = archCircle.cx, cy = archCircle.cy;
+    for (var band = 0; band < 2; band++) {
+        var br = archCircle.r - (band === 0 ? inset1 : inset2);
+        var prev = null;
+        for (var i = 0; i <= 100; i++) {
+            var a = -PI * 0.90 + (i/100) * PI * 0.80;
+            var px = cx + br * Math.cos(a), py = cy + br * Math.sin(a);
+            if (inside(px, py)) {
+                if (prev) lines.push([prev[0], prev[1], px, py]);
+                prev = [px, py];
+            } else { prev = null; }
+        }
+    }
+    var r1 = archCircle.r - inset1, r2 = archCircle.r - inset2;
+    for (var i = 0; i < nTies; i++) {
+        var t = (i+0.5)/nTies;
+        var a = -PI*0.90 + t*PI*0.80;
+        var x1=cx+r1*Math.cos(a),y1=cy+r1*Math.sin(a);
+        var x2=cx+r2*Math.cos(a),y2=cy+r2*Math.sin(a);
+        if(inside(x1,y1)&&inside(x2,y2)) lines.push([x1,y1,x2,y2]);
+    }
+    return lines;
+}
+
+// --- Draw ---
+function drawLines(lines,sw,alpha){
+    push();stroke(192,57,43,alpha);strokeWeight(sw);noFill();
+    for(var i=0;i<lines.length;i++)line(lines[i][0],lines[i][1],lines[i][2],lines[i][3]);
+    pop();
+}
+
 function drawArc3(p1,p2,p3){
     var c=fitCircle3(p1,p2,p3);if(!c)return c;
     var a1=Math.atan2(p1[1]-c.cy,p1[0]-c.cx),a2=Math.atan2(p2[1]-c.cy,p2[0]-c.cx),a3=Math.atan2(p3[1]-c.cy,p3[0]-c.cx);
@@ -220,64 +210,64 @@ function drawArc3(p1,p2,p3){
     beginShape();for(var i=0;i<=60;i++){var t=i/60;var a=a1+sw*t;vertex(c.cx+c.r*Math.cos(a),c.cy+c.r*Math.sin(a));}endShape();
     return c;
 }
-function drawArc2(p1,p3,off){var mx=(p1[0]+p3[0])/2+off,my=(p1[1]+p3[1])/2;drawArc3(p1,[mx,my],p3);}
+function drawArc2(p1,p3,off){drawArc3(p1,[(p1[0]+p3[0])/2+off,(p1[1]+p3[1])/2],p3);}
 
 // ============================================================
-function setup() {
-    createCanvas(W, H, WEBGL);
-    pixelDensity(1);
-    brush.load();
-    select('canvas').parent('wrap');
-    noLoop();
-}
+// COMPOSITION — uses the system, fed by anchor points
+// ============================================================
+function setup(){createCanvas(W,H,WEBGL);pixelDensity(1);brush.load();select('canvas').parent('wrap');noLoop();}
 
-function draw() {
-    translate(-W / 2, -H / 2);
-    noFill();
+function draw(){
+    translate(-W/2,-H/2);noFill();
 
-    var p = {
+    // --- ANCHOR POINTS (from TRACED point editor / optimizer) ---
+    var pts = {
         OA:[387,78],OhL:[73,621],OhR:[701,621],OwL:[46,475],OwR:[728,475],
         IA:[387,122],IhL:[118,635],IhR:[656,635],IwL:[89,476],IwR:[685,476],
         OpL:[55,671],OpR:[719,671],IpL:[102,656],IpR:[672,656],
         OtL:[43,670],OtR:[731,670],ItL:[88,658],ItR:[686,658]
     };
 
-    // Compute arch circle for clipping
-    var archC = fitCircle3(p.IhL, p.IwL, p.IA);
-    if (!archC) return;
-    ARCH_CX = archC.cx; ARCH_CY = archC.cy; ARCH_R = archC.r;
+    // --- DERIVE GEOMETRY from anchor points ---
+    var innerArch = fitCircle3(pts.IhL, pts.IwL, pts.IA);
+    if (!innerArch) return;
 
-    // ========== 1. BORDER BAND (frame within the frame) ==========
-    var border = generateBorderBand(archC, 12, 28, 40);
-    drawLines(border, 1.2, 160);
+    // --- BUILD BOUNDARIES from anchor points ---
+    var archInside = buildArchBoundary(innerArch, pts.IA, pts.IhL, pts.IhR, pts.ItL, pts.ItR, 8);
+    var archBBox = {
+        x: pts.ItL[0],
+        y: pts.IA[1],
+        w: pts.ItR[0] - pts.ItL[0],
+        h: pts.IhL[1] - pts.IA[1]
+    };
 
-    // ========== 2. SINGLE CONTINUOUS FIELD PATTERN ==========
-    // One 6-fold emergent pattern fills the entire arch interior
-    var field = generateFieldPattern(36);
-    drawLines(field, 0.9, 130);
+    // --- PATTERN FILL: emergent 6-fold, clipped to arch boundary ---
+    var gridSize = Math.round(archBBox.w / 16); // ~36px for this arch
+    var field = emergentPattern(archInside, archBBox, gridSize, 'hex');
+    drawLines(field, 1.0, 140);
 
-    // ========== 3. STRUCTURE ==========
-    stroke(192, 57, 43); strokeWeight(3); noFill();
-    drawArc3(p.OhL, p.OwL, p.OA); drawArc3(p.OA, p.OwR, p.OhR);
-    drawArc3(p.IhL, p.IwL, p.IA); drawArc3(p.IA, p.IwR, p.IhR);
+    // --- BORDER BAND: derived from arch circle ---
+    var bandWidth = gridSize * 0.45;
+    var band = borderBand(innerArch, archInside, bandWidth, bandWidth * 2.2, 36);
+    drawLines(band, 1.2, 165);
 
+    // --- STRUCTURAL DRAWING (from anchor points) ---
+    stroke(192,57,43); strokeWeight(3); noFill();
+    drawArc3(pts.OhL,pts.OwL,pts.OA); drawArc3(pts.OA,pts.OwR,pts.OhR);
+    drawArc3(pts.IhL,pts.IwL,pts.IA); drawArc3(pts.IA,pts.IwR,pts.IhR);
     strokeWeight(2);
-    drawArc2(p.OhL, p.OpL, -6); drawArc2(p.OhR, p.OpR, 6);
-    drawArc2(p.IhL, p.IpL, -5); drawArc2(p.IhR, p.IpR, 5);
-
+    drawArc2(pts.OhL,pts.OpL,-6); drawArc2(pts.OhR,pts.OpR,6);
+    drawArc2(pts.IhL,pts.IpL,-5); drawArc2(pts.IhR,pts.IpR,5);
     strokeWeight(3);
-    line(p.OpL[0],p.OpL[1],p.OtL[0],p.OtL[1]); line(p.OpR[0],p.OpR[1],p.OtR[0],p.OtR[1]);
-    line(p.IpL[0],p.IpL[1],p.ItL[0],p.ItL[1]); line(p.IpR[0],p.IpR[1],p.ItR[0],p.ItR[1]);
-    line(43,670,43,1244); line(731,670,731,1244);
-    line(88,658,88,1244); line(686,658,686,1244);
-
+    line(pts.OpL[0],pts.OpL[1],pts.OtL[0],pts.OtL[1]); line(pts.OpR[0],pts.OpR[1],pts.OtR[0],pts.OtR[1]);
+    line(pts.IpL[0],pts.IpL[1],pts.ItL[0],pts.ItL[1]); line(pts.IpR[0],pts.IpR[1],pts.ItR[0],pts.ItR[1]);
+    line(pts.OtL[0],pts.OtL[1],43,1244); line(pts.OtR[0],pts.OtR[1],731,1244);
+    line(pts.ItL[0],pts.ItL[1],88,1244); line(pts.ItR[0],pts.ItR[1],686,1244);
     strokeWeight(4);
     line(27,50,27,1244); line(747,50,747,1244); line(27,1244,747,1244); line(27,50,747,50);
-
-    strokeWeight(2.5); line(387,122,387,1218);
+    strokeWeight(2.5); line(387,pts.IA[1],387,1218);
     strokeWeight(2);
-    line(88,658,686,658);
-    line(88,881,686,881); line(88,1049,686,1049); line(88,1218,686,1218);
+    line(88,658,686,658); line(88,881,686,881); line(88,1049,686,1049); line(88,1218,686,1218);
     line(27,1265,747,1265);
 }
 </script>
