@@ -100,9 +100,10 @@ def fit_line_ransac(points, n_iter=500, threshold=2.0):
     eigenvalues, eigenvectors = np.linalg.eigh(cov)
     direction = eigenvectors[:, 1]  # largest eigenvalue
     
-    # Project to find extent
+    # Project to find extent — use 2nd and 98th percentile to trim outliers
     projections = centered @ direction
-    t_min, t_max = projections.min(), projections.max()
+    t_min = np.percentile(projections, 2)
+    t_max = np.percentile(projections, 98)
     
     p1 = mean + direction * t_min
     p2 = mean + direction * t_max
