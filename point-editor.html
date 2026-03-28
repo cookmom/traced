@@ -52,10 +52,10 @@ var P=[
 {id:'OTLR',x:731,y:670,l:'Outer LegTop R',c:'o'},
 {id:'ITLL',x:88,y:658,l:'Inner LegTop L',c:'i'},
 {id:'ITLR',x:686,y:658,l:'Inner LegTop R',c:'i'},
-{id:'OPLL',x:63,y:670,l:'Outer PinchLow L',c:'o'},
-{id:'OPLR',x:711,y:670,l:'Outer PinchLow R',c:'o'},
-{id:'IPLL',x:105,y:658,l:'Inner PinchLow L',c:'i'},
-{id:'IPLR',x:669,y:658,l:'Inner PinchLow R',c:'i'},
+{id:'OPLL',x:30,y:650,l:'Outer PinchLow L',c:'o'},
+{id:'OPLR',x:744,y:650,l:'Outer PinchLow R',c:'o'},
+{id:'IPLL',x:75,y:648,l:'Inner PinchLow L',c:'i'},
+{id:'IPLR',x:699,y:648,l:'Inner PinchLow R',c:'i'},
 {id:'OTRL',x:48,y:670,l:'Outer Trans L',c:'o'},
 {id:'OTRR',x:726,y:670,l:'Outer Trans R',c:'o'},
 {id:'ITRL',x:93,y:658,l:'Inner Trans L',c:'i'},
@@ -73,10 +73,10 @@ var curves=[
   {pts:['OA','OWR','OHR'],c:'o',l:'Outer R arc'},
   {pts:['IHL','IWL','IA'],c:'i',l:'Inner L arc'},
   {pts:['IA','IWR','IHR'],c:'i',l:'Inner R arc'},
-  {pts:['OHL','OPLL','OTRL'],c:'o',l:'Outer pinch L',flip:true},
-  {pts:['OHR','OPLR','OTRR'],c:'o',l:'Outer pinch R',flip:true},
-  {pts:['IHL','IPLL','ITRL'],c:'i',l:'Inner pinch L',flip:true},
-  {pts:['IHR','IPLR','ITRR'],c:'i',l:'Inner pinch R',flip:true},
+  {pts:['OHL','OPLL','OTRL'],c:'o',l:'Outer pinch L'},
+  {pts:['OHR','OPLR','OTRR'],c:'o',l:'Outer pinch R'},
+  {pts:['IHL','IPLL','ITRL'],c:'i',l:'Inner pinch L'},
+  {pts:['IHR','IPLR','ITRR'],c:'i',l:'Inner pinch R'},
 ];
 var lines_def=[
   
@@ -135,7 +135,7 @@ function render(){
     // Otherwise go the other way
     var sweep=d13;
     if(d12*d13<0||(Math.abs(d12)>Math.abs(d13))){sweep=d13>0?d13-2*Math.PI:d13+2*Math.PI;}
-    if(cur.flip){sweep=sweep>0?sweep-2*Math.PI:sweep+2*Math.PI;}
+    
     for(var i=0;i<=steps;i++){
       var t=i/steps;
       var a=a1+sweep*t;
