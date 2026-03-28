@@ -59,7 +59,7 @@ function drawRosette(cx, cy, r, n, ctx) {
 
 // Fill a rectangular region with star-and-cross pattern
 function fillWithStarPattern(x, y, w, h, tileSize, ctx) {
-    ctx.strokeStyle = 'rgba(192,57,43,0.4)';
+    ctx.strokeStyle = 'rgba(192,57,43,0.7)';
     ctx.lineWidth = 0.8;
     var cols = Math.ceil(w / tileSize) + 1;
     var rows = Math.ceil(h / tileSize) + 1;
@@ -76,7 +76,7 @@ function fillWithStarPattern(x, y, w, h, tileSize, ctx) {
 
 // Fill arch zone with pattern (variable width per row)
 function fillArchWithPattern(archFunc, yStart, yEnd, tileSize, ctx) {
-    ctx.strokeStyle = 'rgba(192,57,43,0.3)';
+    ctx.strokeStyle = 'rgba(192,57,43,0.6)';
     ctx.lineWidth = 0.6;
     for(var y=yStart; y<yEnd; y+=tileSize) {
         var bounds = archFunc(y);
@@ -219,7 +219,7 @@ function draw() {
     // Arch zone pattern (fills between inner and outer arch)
     // Use the inner arch circle to determine width at each y
     if(cIL) {
-        ctx.strokeStyle = 'rgba(192,57,43,0.25)';
+        ctx.strokeStyle = 'rgba(192,57,43,0.5)';
         ctx.lineWidth = 0.5;
         for(var y=130; y<650; y+=25) {
             // Inner arch width at this y
