@@ -256,3 +256,12 @@ After ANY optimization pass, re-enforce symmetry:
 2. Average the Y positions
 3. Apply symmetric positions
 Run optimization WITH symmetry constraint (move L/R pairs together), not independently.
+
+### Lesson 22: THINK FIRST — study the source before coding
+Before ANY arc/point change:
+1. Study the actual source pixel data at the feature location
+2. Understand what the REAL curve looks like (is it dramatic or subtle?)
+3. THEN decide the parameter values
+The horseshoe pinch in this image is nearly vertical — a 25px offset was way too much.
+5-6px matches the actual gentle inward lean.
+Always measure the source before guessing parameters.
