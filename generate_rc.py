@@ -38,7 +38,7 @@ def generate_html(optimized, name="Building", ref_image_path=None):
             formula = f'circle R={r:.0f}' if is_circ else f'arc {sweep_deg:.0f}° R={r:.0f}'
             dur = max(0.6, sweep_deg/200)
             d = r*2
-            actual_sweep = 2*math.pi*(1 if sweep>0 else -1) if is_circ else sweep
+            actual_sweep = 2.1*math.pi*(1 if sweep>0 else -1) if is_circ else sweep  # overshoot to close gap
             steps_js.append(f"""  {{name:'{pname}',formula:'{formula}',dur:{dur:.2f},bbox:{bbox},draw:function(p){{
       noFill();stroke(192,57,43);strokeWeight(3);
       var s1={start:.4f}+{actual_sweep:.4f}*p;
