@@ -34,23 +34,27 @@ button{margin-top:3px;padding:5px;color:#fff;border:none;border-radius:4px;curso
 
 <script>
 var P=[
-{id:'OA',x:387,y:136,l:'Outer Apex',c:'o'},
-{id:'OHL',x:100,y:480,l:'Outer HS L',c:'o'},
-{id:'OHR',x:675,y:480,l:'Outer HS R',c:'o'},
-{id:'OWL',x:85,y:380,l:'Outer Wide L',c:'o'},
-{id:'OWR',x:690,y:380,l:'Outer Wide R',c:'o'},
-{id:'IA',x:387,y:170,l:'Inner Apex',c:'i'},
-{id:'IHL',x:135,y:480,l:'Inner HS L',c:'i'},
-{id:'IHR',x:640,y:480,l:'Inner HS R',c:'i'},
-{id:'IWL',x:120,y:380,l:'Inner Wide L',c:'i'},
-{id:'IWR',x:655,y:380,l:'Inner Wide R',c:'i'},
-{id:'OLL',x:100,y:1218,l:'Outer Leg L',c:'o'},
-{id:'OLR',x:675,y:1218,l:'Outer Leg R',c:'o'},
-{id:'ILL',x:135,y:1218,l:'Inner Leg L',c:'i'},
-{id:'ILR',x:640,y:1218,l:'Inner Leg R',c:'i'}
+{id:'OA',x:385,y:77,l:'Outer Apex',c:'o'},
+{id:'OHL',x:73,y:621,l:'Outer HS L',c:'o'},
+{id:'OHR',x:701,y:621,l:'Outer HS R',c:'o'},
+{id:'OWL',x:45,y:476,l:'Outer Wide L',c:'o'},
+{id:'OWR',x:729,y:476,l:'Outer Wide R',c:'o'},
+{id:'IA',x:388,y:122,l:'Inner Apex',c:'i'},
+{id:'IHL',x:118,y:634,l:'Inner HS L',c:'i'},
+{id:'IHR',x:656,y:634,l:'Inner HS R',c:'i'},
+{id:'IWL',x:90,y:476,l:'Inner Wide L',c:'i'},
+{id:'IWR',x:684,y:476,l:'Inner Wide R',c:'i'},
+{id:'OLL',x:70,y:1267,l:'Outer Leg L',c:'o'},
+{id:'OLR',x:704,y:1267,l:'Outer Leg R',c:'o'},
+{id:'ILL',x:116,y:1269,l:'Inner Leg L',c:'i'},
+{id:'ILR',x:658,y:1269,l:'Inner Leg R',c:'i'},
+{id:'OTLL',x:70,y:621,l:'Outer LegTop L',c:'o'},
+{id:'OTLR',x:704,y:621,l:'Outer LegTop R',c:'o'},
+{id:'ITLL',x:116,y:634,l:'Inner LegTop L',c:'i'},
+{id:'ITLR',x:658,y:634,l:'Inner LegTop R',c:'i'}
 ];
 var IW=774,IH=1280,s=1,act=null,CX=387;
-var sym_map={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL'};
+var sym_map={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL',OTLL:'OTLR',OTLR:'OTLL',ITLL:'ITLR',ITLR:'ITLL'};
 // Curves: arcs defined by 3 points (from, through/apex, to)
 // Left outer arc: from OHL through OWL to OA
 // Right outer arc: from OA through OWR to OHR
@@ -63,8 +67,8 @@ var curves=[
   {pts:['IA','IWR','IHR'],c:'i',l:'Inner R arc'},
 ];
 var lines_def=[
-  {a:'OHL',b:'OLL',c:'o'},{a:'OHR',b:'OLR',c:'o'},
-  {a:'IHL',b:'ILL',c:'i'},{a:'IHR',b:'ILR',c:'i'},
+  
+  {a:'OTLL',b:'OLL',c:'o'},{a:'OTLR',b:'OLR',c:'o'},{a:'ITLL',b:'ILL',c:'i'},{a:'ITLR',b:'ILR',c:'i'},
   {a:'OLL',b:'OLR',c:'o'},{a:'ILL',b:'ILR',c:'i'},
 ];
 var meas=[
@@ -216,13 +220,12 @@ document.addEventListener('wheel',function(e){
   e.preventDefault();
   var wrap=document.getElementById('wrap');
   var rect=wrap.getBoundingClientRect();
-  var mx=(e.clientX-rect.left)/zoom;
-  var my=(e.clientY-rect.top)/zoom;
   var dz=e.deltaY>0?0.9:1.1;
   var nz=Math.max(0.5,Math.min(8,zoom*dz));
-  // Adjust pan so zoom centers on cursor
-  panX-=mx*(nz-zoom);
-  panY-=my*(nz-zoom);
+  // Zoom centered on cursor position
+  var cx=e.clientX,cy=e.clientY;
+  panX=cx-(cx-panX)*(nz/zoom);
+  panY=cy-(cy-panY)*(nz/zoom);
   zoom=nz;
   wrap.style.transform='translate('+panX+'px,'+panY+'px) scale('+zoom+')';
   render();
