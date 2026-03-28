@@ -10,14 +10,14 @@ canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important
 </style>
 </head><body>
 <div id="wrap">
-<img id="ref-src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'">
+<img id="ref-src" src="real-test-mono.jpg" onerror="this.src='https:cookmom.github.io/traced/real-test-mono.jpg'">
 </div>
-<script src="https://cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
+<script src="https:cdn.jsdelivr.net/npm/p5@2.0.3/lib/p5.min.js"></script>
+<script src="https:cdn.jsdelivr.net/npm/p5.brush@2.0.2-beta"></script>
 <script>
 var W=774, H=1280;
 
-// Islamic geometric pattern: 8-fold star and cross
+ Islamic geometric pattern: 8-fold star and cross
 function drawStar8(cx, cy, r) {
     beginShape();
     for(var i=0; i<8; i++) {
@@ -29,7 +29,7 @@ function drawStar8(cx, cy, r) {
     endShape(CLOSE);
 }
 
-// Rosette pattern
+ Rosette pattern
 function drawRosette(cx, cy, r, n) {
     for(var i=0; i<n; i++) {
         var a1 = i * 2*Math.PI/n;
@@ -44,7 +44,7 @@ function drawRosette(cx, cy, r, n) {
     ellipse(cx, cy, r*0.6, r*0.6);
 }
 
-// Fill a rectangular region with star-and-cross pattern
+ Fill a rectangular region with star-and-cross pattern
 function fillWithStarPattern(x, y, w, h, tileSize) {
     push();
     stroke(192,57,43,180);strokeWeight(0.8);noFill();
@@ -62,7 +62,7 @@ function fillWithStarPattern(x, y, w, h, tileSize) {
     pop();
 }
 
-// Fill arch zone with pattern (variable width per row)
+ Fill arch zone with pattern (variable width per row)
 function fillArchWithPattern(archFunc, yStart, yEnd, tileSize, ctx) {
     ctx.strokeStyle = 'rgba(192,57,43,0.6)';
     ctx.lineWidth = 0.6;
@@ -80,7 +80,7 @@ function fillArchWithPattern(archFunc, yStart, yEnd, tileSize, ctx) {
 }
 
 function setup() {
-    var c = createCanvas(W, H);
+    var c = createCanvas(W, H, WEBGL);
     pixelDensity(1);
     c.parent('wrap');
     brush.load();
@@ -88,25 +88,26 @@ function setup() {
 }
 
 function draw() {
+    translate(-W/2, -H/2);
     
     
     
     
     
-    // === STRUCTURAL DRAWING (red, heavier) ===
+     === STRUCTURAL DRAWING (red, heavier) ===
     stroke(192,57,43); strokeWeight(3); noFill();
     
-    // Arch arcs (using vertex curves like generate_rc.py)
-    // Outer arch
+     Arch arcs (using vertex curves like generate_rc.py)
+     Outer arch
     var arcs = [
-        // center, r, startAngle, sweep — from our optimized points
+         center, r, startAngle, sweep — from our optimized points
         {cx:446,cy:474,r:401,sa:-1.429,sw:1.804,label:'outerL'},
-        {cx:328,cy:474,r:401,sa:-1.429+1.804,sw:-1.804,label:'outerR'}, // mirror
+        {cx:328,cy:474,r:401,sa:-1.429+1.804,sw:-1.804,label:'outerR'},  mirror
         {cx:464,cy:490,r:377,sa:-1.396,sw:1.746,label:'innerL'},
         {cx:310,cy:490,r:377,sa:-1.396+1.746,sw:-1.746,label:'innerR'},
     ];
     
-    // Actually, use the fitCircle approach from our points
+     Actually, use the fitCircle approach from our points
     var pts = {
         'O.apex':[387,78],'O.hs.L':[73,621],'O.hs.R':[701,621],
         'O.wide.L':[46,475],'O.wide.R':[728,475],
@@ -144,14 +145,14 @@ function draw() {
         return c;
     }
     
-    // Main arcs
+     Main arcs
     strokeWeight(3);
     var cOL = drawArc3(pts['O.hs.L'],pts['O.wide.L'],pts['O.apex']);
     drawArc3(pts['O.apex'],pts['O.wide.R'],pts['O.hs.R']);
     var cIL = drawArc3(pts['I.hs.L'],pts['I.wide.L'],pts['I.apex']);
     drawArc3(pts['I.apex'],pts['I.wide.R'],pts['I.hs.R']);
     
-    // Pinch arcs (flat)
+     Pinch arcs (flat)
     strokeWeight(2);
     function drawArc2(p1,p3,off){
         var mx=(p1[0]+p3[0])/2+off,my=(p1[1]+p3[1])/2;
@@ -162,7 +163,7 @@ function draw() {
     drawArc2(pts['I.hs.L'],pts['I.pinch.L'],-5);
     drawArc2(pts['I.hs.R'],pts['I.pinch.R'],5);
     
-    // Lines
+     Lines
     strokeWeight(3);
     function L(a,b){line(a[0],a[1],b[0],b[1]);}
     L(pts['O.pinch.L'],pts['O.legTop.L']);L(pts['O.pinch.R'],pts['O.legTop.R']);
@@ -170,53 +171,53 @@ function draw() {
     L(pts['O.legTop.L'],[43,1244]);L(pts['O.legTop.R'],[731,1244]);
     L(pts['I.legTop.L'],[88,1244]);L(pts['I.legTop.R'],[686,1244]);
     
-    // Outer frame
+     Outer frame
     strokeWeight(4);
     line(27,50,27,1244);line(747,50,747,1244);line(27,1244,747,1244);
     
-    // Door center divide
+     Door center divide
     strokeWeight(2);
     line(382,122,382,1218);
     
-    // Door panels
+     Door panels
     line(88,658,382,658);line(382,658,686,658);
     line(88,881,686,881);line(88,1049,686,1049);
     line(88,1218,686,1218);
     
-    // Threshold
+     Threshold
     strokeWeight(2);
     line(27,1265,747,1265);
     
-    // === PATTERN FILLS ===
+     === PATTERN FILLS ===
     push();
     
-    // Left door panel: star pattern
+     Left door panel: star pattern
     fillWithStarPattern(95, 665, 280, 210, 35, ctx);
     
-    // Right door panel
+     Right door panel
     fillWithStarPattern(390, 665, 290, 210, 35, ctx);
     
-    // Lower left panel
+     Lower left panel
     fillWithStarPattern(95, 888, 280, 155, 30, ctx);
     fillWithStarPattern(390, 888, 290, 155, 30, ctx);
     
-    // Bottom panels
+     Bottom panels
     fillWithStarPattern(95, 1055, 280, 160, 28, ctx);
     fillWithStarPattern(390, 1055, 290, 160, 28, ctx);
     
-    // Arch zone pattern (fills between inner and outer arch)
-    // Use the inner arch circle to determine width at each y
+     Arch zone pattern (fills between inner and outer arch)
+     Use the inner arch circle to determine width at each y
     if(cIL) {
         stroke(192,57,43,128);
         strokeWeight(0.5);
         for(var y=130; y<650; y+=25) {
-            // Inner arch width at this y
+             Inner arch width at this y
             var dyI = y - cIL.cy;
             if(Math.abs(dyI) < cIL.r) {
                 var dxI = Math.sqrt(cIL.r*cIL.r - dyI*dyI);
                 var xL = cIL.cx - dxI;
-                var xR = 774 - xL; // symmetric
-                // Draw small rosettes along this row
+                var xR = 774 - xL;  symmetric
+                 Draw small rosettes along this row
                 var rowW = xR - xL;
                 if(rowW > 40) {
                     var cols = Math.floor(rowW / 25);
@@ -229,11 +230,11 @@ function draw() {
         }
     }
     
-    // Door knocker
+     Door knocker
     stroke(192,57,43);strokeWeight(2);noFill();
     ellipse(395, 680, 40, 40);
     ellipse(395, 680, 70, 70);
-    // Knocker ring detail
+     Knocker ring detail
     strokeWeight(1.5);
     for(var i=0;i<12;i++){
         var a=i*Math.PI/6;
