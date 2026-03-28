@@ -248,3 +248,11 @@ When optimizing arc positions, constrain the search:
 - Or: only match edges that are on the expected side of the arc
 - Or: use the signed distance (positive = correct side, negative = wrong side)
 Never let the optimizer flip an arc's curvature direction just because a closer edge exists on the other side.
+
+### Lesson 21: ALWAYS enforce symmetry after optimization
+Gradient descent treats each point independently — it will break L/R symmetry to find local minima.
+After ANY optimization pass, re-enforce symmetry:
+1. For each L/R pair, average the distances from center
+2. Average the Y positions
+3. Apply symmetric positions
+Run optimization WITH symmetry constraint (move L/R pairs together), not independently.
