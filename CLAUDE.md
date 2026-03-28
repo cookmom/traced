@@ -169,3 +169,23 @@ For a pointed horseshoe arch, mark these 14+ points:
 - OLL/OLR, ILL/ILR: Leg bottoms
 
 Arc construction: fit circle through 3 points (HS → Wide → Apex) for each half.
+
+### Lesson 17: ALWAYS visually verify your own output before sending
+Use GPU Chrome screenshot + pixel analysis. Check for:
+- Are all expected colors present? (red outer, blue inner)  
+- Use appropriate detection thresholds (blue at 136 won't pass >200 check)
+- Compare overlay against source at key feature points
+
+### Lesson 18: Arc direction = middle point position
+An arc through 3 points bows toward the middle point. If the middle point is:
+- Outward from center → arc bows outward ✓
+- Inward from center → arc bows inward ✗ (for horseshoe)
+No flip flags needed. Just put the middle point on the correct side.
+
+### Horseshoe Arch Construction (Final)
+1. Main arcs: HS → wide → apex (4 arcs, 2 per border)
+2. Pinch arcs: wide → HS → pinch (4 arcs, curving outward)
+3. Lines: pinch → legTop (short horizontal, 4 lines)
+4. Lines: legTop → leg bottom (vertical legs, 4 lines)
+5. Line: leg bottom L → leg bottom R (frame bottom)
+Total: 8 arcs + 9 lines = 17 primitives for double-border horseshoe arch
