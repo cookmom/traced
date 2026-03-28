@@ -189,3 +189,9 @@ No flip flags needed. Just put the middle point on the correct side.
 4. Lines: legTop → leg bottom (vertical legs, 4 lines)
 5. Line: leg bottom L → leg bottom R (frame bottom)
 Total: 8 arcs + 9 lines = 17 primitives for double-border horseshoe arch
+
+### Lesson 19: CHECK YOUR OWN UI FOR OCCLUSION
+The UI panel was 220px wide and covered the right 28% of the 774px image.
+Every "broken right arc" for the last 6 hours was actually correct — just hidden.
+ALWAYS close/hide UI overlays before evaluating the render.
+Use dev-browser to programmatically hide panels before screenshots.
