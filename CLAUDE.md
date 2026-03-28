@@ -265,3 +265,43 @@ Before ANY arc/point change:
 The horseshoe pinch in this image is nearly vertical — a 25px offset was way too much.
 5-6px matches the actual gentle inward lean.
 Always measure the source before guessing parameters.
+
+## Pretext — Text as a Primitive (Added 2026-03-28)
+
+### What
+Pure JS text measurement & layout. No DOM, no reflow. Canvas/SVG/WebGL/server-side.
+`npm install @chenglou/pretext`
+
+### Why in TRACED
+Text is the third primitive alongside lines and arcs:
+- **Dimension labels**: "R=401", "span=575px" positioned precisely on canvas
+- **Architectural annotation**: room names, material callouts, scale bars
+- **Mihrab calligraphy**: Arabic text flowing along arch curves using `layoutNextLine()` with variable width from arch geometry
+- **Calligraphic patterns**: text shaped to fill geometric zones (spandrels, concentric bands, tile panels)
+
+### Core API
+```js
+import { prepare, layout, prepareWithSegments, layoutNextLine } from '@chenglou/pretext'
+
+// Simple measurement
+const prepared = prepare(text, '16px Inter')
+const { height } = layout(prepared, maxWidth, lineHeight)
+
+// Line-by-line for curved paths
+const prepared = prepareWithSegments(text, '18px "Noto Naskh Arabic"')
+let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+while (true) {
+    const width = getArchWidthAtY(y) // from TRACED arch geometry
+    const line = layoutNextLine(prepared, cursor, width)
+    if (!line) break
+    // Render line along arc path using p5.brush
+    cursor = line.end
+    y += lineHeight
+}
+```
+
+### Integration with TRACED pipeline
+TRACED geometry (arcs/lines) → Pretext text layout along geometry → p5.brush calligraphic rendering
+
+### Connection to fatiha.app
+Voice recitation → Pretext layouts text along TRACED geometric paths → p5.brush renders calligraphic strokes progressively
