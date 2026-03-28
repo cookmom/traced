@@ -102,3 +102,17 @@ Edge detection finds every pixel intensity change equally. Claude understands WH
 3. Mask the arch region → HoughCircles → average top candidates
 4. Add door features (knocker, panels) from Claude understanding
 5. Sort by size (biggest first) → generate
+
+### Lesson 11: Identify arch TYPE before computing geometry
+- Round arch = one arc, semicircular (180°)
+- Horseshoe = one arc, >180° sweep
+- POINTED = TWO arcs from offset centers meeting at a sharp apex
+- Pointed horseshoe = TWO arcs, each >90°, from offset centers, with legs continuing past vertical
+- Always check: does the arch meet at a POINT or a CURVE at the top?
+
+### Feature Markers for Moroccan/Islamic Architecture
+- **Apex**: the topmost point of the arch (may be pointed or curved)
+- **Springing points**: where arch curves meet the vertical legs
+- **Band width**: the decorative border width (outer arch - inner arch)
+- **Horseshoe pinch**: where the arch curves INWARD past vertical before meeting legs
+- The arch band should be consistent width throughout — inner arch tracks outer arch at constant offset
