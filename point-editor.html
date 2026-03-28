@@ -1,226 +1,151 @@
 <!-- بسم الله الرحمن الرحيم -->
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Traced — Point Editor</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a1a1a;color:#eee;font-family:'SF Mono',monospace;overflow:hidden}
+body{background:#1a1a1a;color:#eee;font-family:'SF Mono',monospace;overflow:hidden;touch-action:none}
 #wrap{position:relative;display:inline-block}
-#wrap img{display:block;max-height:100vh;max-width:100vw}
-.pt{position:absolute;pointer-events:none;z-index:10}
-.pt svg{display:block}
-.pt .lbl{position:absolute;left:20px;top:-6px;font-size:11px;white-space:nowrap;background:rgba(0,0,0,0.85);padding:1px 5px;border-radius:2px;pointer-events:none}
-.pt.active .lbl{background:rgba(255,255,255,0.9);color:#000}
-.outer .lbl{color:#ff4444}
-.inner .lbl{color:#4488ff}
-#panel{position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.92);padding:12px;border-radius:8px;z-index:100;max-height:90vh;overflow-y:auto;width:260px}
-#panel h3{margin-bottom:8px;font-size:13px;color:#888}
-.row{display:flex;justify-content:space-between;font-size:11px;padding:3px 4px;border-bottom:1px solid #333;cursor:pointer;border-radius:3px}
+#wrap img{display:block;max-height:100vh;max-width:100vw;-webkit-user-drag:none;user-select:none}
+.pt{position:absolute;pointer-events:none;z-index:10;transition:opacity 0.15s}
+.pt.dim{opacity:0.25}
+.pt .lbl{position:absolute;left:18px;top:-6px;font-size:11px;white-space:nowrap;background:rgba(0,0,0,0.85);padding:1px 5px;border-radius:2px}
+.pt.active .lbl{background:#fff;color:#000;font-weight:bold}
+#panel{position:fixed;top:8px;right:8px;background:rgba(0,0,0,0.92);padding:10px;border-radius:8px;z-index:100;max-height:95vh;overflow-y:auto;width:240px;font-size:11px}
+#panel h3{margin-bottom:6px;font-size:12px;color:#888}
+.row{display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid #222;cursor:pointer;border-radius:3px}
 .row:hover{background:#333}
 .row.active{background:#c0392b}
 .row .k{color:#aaa}.row .v{color:#fff}
 .row.active .k,.row.active .v{color:#fff}
-button{margin-top:6px;padding:6px 12px;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px;width:100%}
+#measures{border-top:1px solid #444;padding-top:4px;margin-top:4px}
+button{margin-top:4px;padding:5px 10px;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px;width:100%}
 #export{background:#c0392b}
-#export:hover{background:#e74c3c}
-#add{background:#2980b9}
-#json-out{margin-top:8px;font-size:10px;color:#666;word-break:break-all;max-height:150px;overflow-y:auto}
+#add{background:#2980b9;margin-top:3px}
+#json-out{margin-top:6px;font-size:9px;color:#555;max-height:120px;overflow-y:auto;word-break:break-all}
 </style>
 </head><body>
-<div id="wrap">
-<img id="src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'">
-</div>
+<div id="wrap"><img id="src" src="real-test-mono.jpg" onerror="this.src='https://cookmom.github.io/traced/real-test-mono.jpg'"></div>
 <div id="panel">
-<h3>Feature Points <span id="active-label" style="color:#c0392b"></span></h3>
+<h3>Points <span id="albl" style="color:#c0392b"></span></h3>
 <div id="coords"></div>
-<div style="margin:8px 0;display:flex;align-items:center;gap:6px">
-<input type="checkbox" id="sym" checked onchange="symmetric=this.checked">
-<label for="sym" style="font-size:11px;color:#aaa">Symmetric (L↔R)</label>
-</div>
-<div id="measures" style="margin-bottom:8px;border-top:1px solid #444;padding-top:6px"></div>
-<button id="export" onclick="exportJSON()">📋 Copy JSON</button>
-<button id="add" onclick="addPoint()">+ Add Point</button>
+<div id="measures"></div>
+<label style="display:flex;align-items:center;gap:5px;padding:4px 0;color:#aaa"><input type="checkbox" id="sym" checked> Symmetric L↔R</label>
+<button id="export" onclick="doExport()">📋 Copy JSON</button>
+<button id="add" onclick="doAdd()">+ Add Point</button>
 <div id="json-out"></div>
 </div>
+<svg id="msv" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5"></svg>
 
 <script>
-var points = [
-  {id:'OA', x:387, y:136, label:'Outer Apex', cls:'outer'},
-  {id:'OHL', x:100, y:480, label:'Outer HS Left', cls:'outer'},
-  {id:'OHR', x:675, y:480, label:'Outer HS Right', cls:'outer'},
-  {id:'OWL', x:85, y:380, label:'Outer Wide L', cls:'outer'},
-  {id:'OWR', x:690, y:380, label:'Outer Wide R', cls:'outer'},
-  {id:'IA', x:387, y:170, label:'Inner Apex', cls:'inner'},
-  {id:'IHL', x:135, y:480, label:'Inner HS Left', cls:'inner'},
-  {id:'IHR', x:640, y:480, label:'Inner HS Right', cls:'inner'},
-  {id:'IWL', x:120, y:380, label:'Inner Wide L', cls:'inner'},
-  {id:'IWR', x:655, y:380, label:'Inner Wide R', cls:'inner'},
-  {id:'OLL', x:100, y:1218, label:'Outer Leg Btm L', cls:'outer'},
-  {id:'OLR', x:675, y:1218, label:'Outer Leg Btm R', cls:'outer'},
-  {id:'ILL', x:135, y:1218, label:'Inner Leg Btm L', cls:'inner'},
-  {id:'ILR', x:640, y:1218, label:'Inner Leg Btm R', cls:'inner'},
+var P=[
+{id:'OA',x:387,y:136,l:'Outer Apex',c:'outer'},
+{id:'OHL',x:100,y:480,l:'Outer HS L',c:'outer'},
+{id:'OHR',x:675,y:480,l:'Outer HS R',c:'outer'},
+{id:'OWL',x:85,y:380,l:'Outer Wide L',c:'outer'},
+{id:'OWR',x:690,y:380,l:'Outer Wide R',c:'outer'},
+{id:'IA',x:387,y:170,l:'Inner Apex',c:'inner'},
+{id:'IHL',x:135,y:480,l:'Inner HS L',c:'inner'},
+{id:'IHR',x:640,y:480,l:'Inner HS R',c:'inner'},
+{id:'IWL',x:120,y:380,l:'Inner Wide L',c:'inner'},
+{id:'IWR',x:655,y:380,l:'Inner Wide R',c:'inner'},
+{id:'OLL',x:100,y:1218,l:'Outer Leg L',c:'outer'},
+{id:'OLR',x:675,y:1218,l:'Outer Leg R',c:'outer'},
+{id:'ILL',x:135,y:1218,l:'Inner Leg L',c:'inner'},
+{id:'ILR',x:640,y:1218,l:'Inner Leg R',c:'inner'}
+];
+var W=774,H=1280,s=1,act=null;
+var CX=387;
+var sym={OHL:'OHR',OHR:'OHL',OWL:'OWR',OWR:'OWL',IHL:'IHR',IHR:'IHL',IWL:'IWR',IWR:'IWL',OLL:'OLR',OLR:'OLL',ILL:'ILR',ILR:'ILL'};
+var meas=[
+{a:'OWL',b:'OWR',l:'Outer Width'},{a:'IWL',b:'IWR',l:'Inner Width'},
+{a:'OHL',b:'OHR',l:'HS Width'},{a:'IHL',b:'IHR',l:'Inner HS Width'},
+{a:'OA',b:'IA',l:'Band@Apex'},{a:'OWL',b:'IWL',l:'Band L'},{a:'OWR',b:'IWR',l:'Band R'}
 ];
 
-var imgW=774, imgH=1280, scale=1;
-var activeId = null;
+function fp(id){return P.find(function(p){return p.id===id});}
+function sc(){s=document.getElementById('src').offsetWidth/W;}
 
-function init(){
-  var img = document.getElementById('src');
-  img.onload = function(){
-    scale = img.offsetWidth / imgW;
-    renderPoints();
-  };
-  
-  // Click on image = move active point there
-  document.getElementById('wrap').addEventListener('click', function(e){
-    if(!activeId) return;
-    var rect = document.getElementById('wrap').getBoundingClientRect();
-    var x = Math.round((e.clientX - rect.left) / scale);
-    var y = Math.round((e.clientY - rect.top) / scale);
-    var p = points.find(function(p){return p.id===activeId;});
-    if(p){
-      p.x = x; p.y = y;
-      // Apply symmetry
-      if(symmetric && symPairs[p.id]){
-        var mirror = points.find(function(q){return q.id===symPairs[p.id];});
-        if(mirror){
-          mirror.x = 2*centerX - x;
-          mirror.y = y;
-        }
-      }
-      renderPoints();
-    }
-  });
-}
-
-function makeSVG(cls, active){
-  var c = cls === 'outer' ? '#ff4444' : '#4488ff';
-  if(active) c = '#ffffff';
-  return '<svg width="24" height="24" viewBox="0 0 24 24">' +
-    '<line x1="0" y1="12" x2="24" y2="12" stroke="'+c+'" stroke-width="2"/>' +
-    '<line x1="12" y1="0" x2="12" y2="24" stroke="'+c+'" stroke-width="2"/>' +
-    '<circle cx="12" cy="12" r="5" fill="none" stroke="'+c+'" stroke-width="2"/>' +
-    '</svg>';
-}
-
-function renderPoints(){
-  document.querySelectorAll('.pt').forEach(function(e){e.remove();});
-  var wrap = document.getElementById('wrap');
-  scale = document.getElementById('src').offsetWidth / imgW;
-  
-  points.forEach(function(p){
-    var el = document.createElement('div');
-    var isActive = p.id === activeId;
-    el.className = 'pt ' + p.cls + (isActive ? ' active' : '');
-    el.style.left = (p.x * scale - 12) + 'px';
-    el.style.top = (p.y * scale - 12) + 'px';
-    el.innerHTML = makeSVG(p.cls, isActive) + '<div class="lbl">' + p.id + '</div>';
+function render(){
+  sc();
+  var wrap=document.getElementById('wrap');
+  wrap.querySelectorAll('.pt').forEach(function(e){e.remove();});
+  P.forEach(function(p){
+    var el=document.createElement('div');
+    var isA=p.id===act;
+    var col=p.c==='outer'?'#ff4444':'#4488ff';
+    if(isA)col='#ffffff';
+    el.className='pt '+(isA?'active':(act?'dim':''));
+    el.style.left=(p.x*s-12)+'px';
+    el.style.top=(p.y*s-12)+'px';
+    el.innerHTML='<svg width="24" height="24"><line x1="0" y1="12" x2="24" y2="12" stroke="'+col+'" stroke-width="2"/><line x1="12" y1="0" x2="12" y2="24" stroke="'+col+'" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="'+col+'" stroke-width="2"/></svg><div class="lbl" style="color:'+col+'">'+p.id+'</div>';
     wrap.appendChild(el);
   });
-  updatePanel();
-  // Draw measurement lines
-  var svg = document.getElementById('meas-svg');
-  if(!svg){
-    svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-    svg.id='meas-svg';
-    svg.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5';
-    wrap.appendChild(svg);
-  }
-  svg.innerHTML='';
-  measurements.forEach(function(m){
-    var pa = points.find(function(p){return p.id===m.a;});
-    var pb = points.find(function(p){return p.id===m.b;});
-    if(pa && pb){
-      var line = document.createElementNS('http://www.w3.org/2000/svg','line');
-      line.setAttribute('x1',pa.x*scale);line.setAttribute('y1',pa.y*scale);
-      line.setAttribute('x2',pb.x*scale);line.setAttribute('y2',pb.y*scale);
-      line.setAttribute('stroke','rgba(255,255,0,0.4)');line.setAttribute('stroke-width','1');
-      line.setAttribute('stroke-dasharray','4,4');
-      svg.appendChild(line);
-      var dx=pb.x-pa.x,dy=pb.y-pa.y;
-      var dist=Math.round(Math.sqrt(dx*dx+dy*dy));
-      var txt=document.createElementNS('http://www.w3.org/2000/svg','text');
-      txt.setAttribute('x',(pa.x+pb.x)/2*scale);txt.setAttribute('y',(pa.y+pb.y)/2*scale-4);
-      txt.setAttribute('fill','yellow');txt.setAttribute('font-size','10');txt.setAttribute('text-anchor','middle');
-      txt.textContent=dist+'px';
-      svg.appendChild(txt);
-    }
-  });
-}
-
-function selectPoint(id){
-  activeId = (activeId === id) ? null : id;
-  document.getElementById('active-label').textContent = activeId ? '→ ' + activeId : '';
-  renderPoints();
-}
-
-function updatePanel(){
-  var html = '';
-  points.forEach(function(p){
-    var ac = p.id === activeId ? ' active' : '';
-    html += '<div class="row'+ac+'" onclick="selectPoint(\''+p.id+'\')">' +
-      '<span class="k">'+p.id+'</span><span class="v">('+p.x+', '+p.y+')</span></div>';
-  });
-  document.getElementById('coords').innerHTML = html;
   // Measurements
-  var mhtml = '';
-  measurements.forEach(function(m){
-    var pa = points.find(function(p){return p.id===m.a;});
-    var pb = points.find(function(p){return p.id===m.b;});
-    if(pa && pb){
-      var dx = pb.x-pa.x, dy = pb.y-pa.y;
-      var dist = Math.round(Math.sqrt(dx*dx+dy*dy));
-      mhtml += '<div style="font-size:10px;color:#888;padding:1px 0">'+m.label+': <b style="color:#fff">'+dist+'px</b></div>';
-    }
+  var svg=document.getElementById('msv');
+  svg.innerHTML='';
+  svg.style.width=wrap.offsetWidth+'px';
+  svg.style.height=wrap.offsetHeight+'px';
+  meas.forEach(function(m){
+    var a=fp(m.a),b=fp(m.b);if(!a||!b)return;
+    var dx=b.x-a.x,dy=b.y-a.y,d=Math.round(Math.sqrt(dx*dx+dy*dy));
+    var ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',a.x*s);ln.setAttribute('y1',a.y*s);ln.setAttribute('x2',b.x*s);ln.setAttribute('y2',b.y*s);
+    ln.setAttribute('stroke','rgba(255,255,0,0.3)');ln.setAttribute('stroke-width','1');ln.setAttribute('stroke-dasharray','3,3');
+    svg.appendChild(ln);
+    var t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',(a.x+b.x)/2*s);t.setAttribute('y',(a.y+b.y)/2*s-3);
+    t.setAttribute('fill','rgba(255,255,0,0.6)');t.setAttribute('font-size','9');t.setAttribute('text-anchor','middle');
+    t.textContent=d+'';svg.appendChild(t);
   });
-  document.getElementById('measures').innerHTML = mhtml;
-}
-
-function exportJSON(){
-  var obj = {};
-  points.forEach(function(p){ obj[p.id] = {x:p.x, y:p.y, label:p.label}; });
-  var json = JSON.stringify(obj, null, 2);
-  navigator.clipboard.writeText(json).then(function(){
-    document.getElementById('json-out').textContent = '✅ Copied!\n' + json;
-  }).catch(function(){
-    document.getElementById('json-out').textContent = json;
+  // Panel
+  var h='';
+  P.forEach(function(p){
+    h+='<div class="row'+(p.id===act?' active':'')+'" onclick="sel(\''+p.id+'\')"><span class="k">'+p.id+'</span><span class="v">('+p.x+','+p.y+')</span></div>';
   });
+  document.getElementById('coords').innerHTML=h;
+  var mh='';
+  meas.forEach(function(m){
+    var a=fp(m.a),b=fp(m.b);if(!a||!b)return;
+    var d=Math.round(Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2));
+    mh+='<div style="color:#888;padding:1px 0">'+m.l+': <b style="color:#fff">'+d+'</b></div>';
+  });
+  document.getElementById('measures').innerHTML=mh;
+  document.getElementById('albl').textContent=act?'→ '+act:'';
 }
 
-function addPoint(){
-  var id = prompt('Point ID:');
-  if(!id) return;
-  var label = prompt('Label:') || id;
-  var cls = prompt('outer or inner?') || 'outer';
-  points.push({id:id, x:Math.round(imgW/2), y:Math.round(imgH/2), label:label, cls:cls});
-  activeId = id;
-  renderPoints();
+function sel(id){act=(act===id)?null:id;render();}
+
+document.getElementById('wrap').addEventListener('click',function(e){
+  if(!act)return;
+  sc();
+  var r=this.getBoundingClientRect();
+  var x=Math.round((e.clientX-r.left)/s);
+  var y=Math.round((e.clientY-r.top)/s);
+  x=Math.max(0,Math.min(W,x));y=Math.max(0,Math.min(H,y));
+  var p=fp(act);if(!p)return;
+  p.x=x;p.y=y;
+  if(document.getElementById('sym').checked&&sym[act]){
+    var m=fp(sym[act]);if(m){m.x=2*CX-x;m.y=y;}
+  }
+  render();
+});
+
+function doExport(){
+  var o={};P.forEach(function(p){o[p.id]={x:p.x,y:p.y,label:p.l};});
+  var j=JSON.stringify(o,null,2);
+  navigator.clipboard.writeText(j).then(function(){
+    document.getElementById('json-out').textContent='✅ Copied!\n'+j;
+  }).catch(function(){document.getElementById('json-out').textContent=j;});
+}
+function doAdd(){
+  var id=prompt('ID:');if(!id)return;
+  var l=prompt('Label:')||id;
+  var c=prompt('outer/inner?')||'outer';
+  P.push({id:id,x:Math.round(W/2),y:Math.round(H/2),l:l,c:c});
+  act=id;render();
 }
 
-
-// Symmetry pairs: moving one mirrors the other around centerX
-var centerX = 387;
-var symPairs = {
-  'OHL':'OHR', 'OHR':'OHL',
-  'OWL':'OWR', 'OWR':'OWL',
-  'IHL':'IHR', 'IHR':'IHL',
-  'IWL':'IWR', 'IWR':'IWL',
-  'OLL':'OLR', 'OLR':'OLL',
-  'ILL':'ILR', 'ILR':'ILL',
-};
-var symmetric = true;
-
-// Measurement pairs to show distances
-var measurements = [
-  {a:'OWL', b:'OWR', label:'Outer Width'},
-  {a:'IWL', b:'IWR', label:'Inner Width'},
-  {a:'OHL', b:'OHR', label:'Outer HS Width'},
-  {a:'IHL', b:'IHR', label:'Inner HS Width'},
-  {a:'OA', b:'IA', label:'Band at Apex'},
-  {a:'OWL', b:'IWL', label:'Band Left'},
-  {a:'OWR', b:'IWR', label:'Band Right'},
-];
-
-window.addEventListener('resize', renderPoints);
-init();
+document.getElementById('src').onload=render;
+window.addEventListener('resize',render);
 </script>
 </body></html>
