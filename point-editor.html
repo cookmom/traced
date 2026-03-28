@@ -71,10 +71,14 @@ var curves=[
   {pts:['I.apex','I.wide.R','I.hs.R'],c:'i',l:'Inner R arc'},
 
 
+  {pts:['O.hs.L','O.pinch.L'],c:'o',l:'Outer pinch L',mid:-20},
+  {pts:['O.hs.R','O.pinch.R'],c:'o',l:'Outer pinch R',mid:20},
+  {pts:['I.hs.L','I.pinch.L'],c:'i',l:'Inner pinch L',mid:-15},
+  {pts:['I.hs.R','I.pinch.R'],c:'i',l:'Inner pinch R',mid:15},
 ];
 var lines_def=[
   
-  {a:'O.hs.L',b:'O.pinch.L',c:'o'},{a:'O.hs.R',b:'O.pinch.R',c:'o'},{a:'I.hs.L',b:'I.pinch.L',c:'i'},{a:'I.hs.R',b:'I.pinch.R',c:'i'},{a:'O.pinch.L',b:'O.legTop.L',c:'o'},{a:'O.pinch.R',b:'O.legTop.R',c:'o'},{a:'I.pinch.L',b:'I.legTop.L',c:'i'},{a:'I.pinch.R',b:'I.legTop.R',c:'i'},{a:'O.legTop.L',b:'O.leg.L',c:'o'},{a:'O.legTop.R',b:'O.leg.R',c:'o'},{a:'I.legTop.L',b:'I.leg.L',c:'i'},{a:'I.legTop.R',b:'I.leg.R',c:'i'},
+  {a:'O.pinch.L',b:'O.legTop.L',c:'o'},{a:'O.pinch.R',b:'O.legTop.R',c:'o'},{a:'I.pinch.L',b:'I.legTop.L',c:'i'},{a:'I.pinch.R',b:'I.legTop.R',c:'i'},{a:'O.legTop.L',b:'O.leg.L',c:'o'},{a:'O.legTop.R',b:'O.leg.R',c:'o'},{a:'I.legTop.L',b:'I.leg.L',c:'i'},{a:'I.legTop.R',b:'I.leg.R',c:'i'},
   {a:'O.leg.L',b:'O.leg.R',c:'o'},{a:'I.leg.L',b:'I.leg.R',c:'i'},
 ];
 var meas=[
@@ -109,7 +113,13 @@ function render(){
 
   // Draw curves (arcs through 3 points)
   curves.forEach(function(cur){
-    var p1=fp(cur.pts[0]),p2=fp(cur.pts[1]),p3=fp(cur.pts[2]);
+    var p1=fp(cur.pts[0]),p3=fp(cur.pts[cur.pts.length-1]);
+    var p2;
+    if(cur.pts.length===3){p2=fp(cur.pts[1]);}
+    else if(cur.mid){
+      var mx=(p1.x+p3.x)/2,my=(p1.y+p3.y)/2;
+      p2={x:mx+cur.mid,y:my};
+    }else{p2=fp(cur.pts[1]);}
     if(!p1||!p2||!p3)return;
     var circle=fitCircle(p1,p2,p3);
     if(!circle)return;
